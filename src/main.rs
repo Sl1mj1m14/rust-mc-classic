@@ -9,6 +9,8 @@ use std::fmt::Error; //Temporary error until serializer implements it's own
 use std::fs::read;
 use std::io::Read;
 
+use thiserror::Error;
+
 use mc_classic_js as js;
 
 

@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 flate2 = "1.0.35"
+thiserror = "1"
 mc-classic-js = "0.1.3"
