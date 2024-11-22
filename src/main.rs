@@ -2,7 +2,7 @@ mod serialize;
 mod from_stream;
 
 use flate2::read::GzDecoder;
-use from_stream::{i16_fs, i64_fs, str_fs, u16_fs};
+use from_stream::{i16_fs, i64_fs, str_fs, u16_fs, u32_fs};
 use serialize::deserialize;
 
 use std::fmt::Error; //Temporary error until serializer implements it's own
@@ -99,7 +99,7 @@ fn read_level (file: String) -> Level {
     d_stream.read_to_end(&mut bytes).unwrap();
 
     //Checking for a magic number at the start of the file
-    let magic_number: u32 = u32::from_be_bytes([bytes[0],bytes[1],bytes[2],bytes[3]]);
+    let magic_number: u32 = u32_fs(0, &bytes[..]);
 
     println!("{magic_number}");
 
@@ -131,18 +131,22 @@ pub fn classic_13_to_level (bytes: Vec<u8>) -> Level {
     //Parsing and setting level name - String format
     let mut sh: u16 = u16_fs(buf, &bytes[..]);
     level.name = Some(str_fs(buf, &bytes[..], sh as i32));
+    buf += 2 + sh as usize;
 
     //Parsing and setting author name - String format
     sh = u16_fs(buf, &bytes[..]);
     level.creator = Some(str_fs(buf, &bytes[..], sh as i32));
+    buf += 2 + sh as usize;
 
     //Setting timestamp - Long format
     level.createTime = Some(i64_fs(buf, &bytes[..]));
+    buf += 2;
 
     //Setting width, depth, and height - Short Format
     level.width = Some(i16_fs(buf, &bytes[..]));
     level.height = Some(i16_fs(buf, &bytes[..]));
     level.depth = Some(i16_fs(buf, &bytes[..]));
+    buf += 4 * 3;
 
     println!("x: {} y: {} z: {}", level.width.unwrap(),level.height.unwrap(),level.depth.unwrap());
 
