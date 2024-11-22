@@ -5,7 +5,7 @@
  * Handle Exceptions TC_EXCEPTION
  */
 
-use crate::from_stream::{i16_fs,i32_fs};
+use crate::from_stream::{i16_fs,i32_fs,str_fs};
 use thiserror::Error;
 
 pub const STREAM_MAGIC: i16 = 0xAC_ED;
@@ -231,13 +231,13 @@ pub enum Value {
 }
 
 #[derive(Clone)]
-pub enum Handle {
-    NewClass(NewClass),
-    NewClassDesc(NewClassDesc),
-    NewArray(NewArray),
-    NewObject(NewObject),
-    NewString(NewString),
-    NewEnum(NewEnum)
+pub enum Handle<'a> {
+    NewClass(&'a NewClass),
+    NewClassDesc(&'a NewClassDesc),
+    NewArray(&'a NewArray),
+    NewObject(&'a NewObject),
+    NewString(&'a NewString),
+    NewEnum(&'a NewEnum)
 }
 
 #[derive(Error, Debug)]
@@ -255,13 +255,13 @@ pub enum DeserializeError {
     Unimplemented(String)
 }
 
-pub struct Deserializer {
+pub struct Deserializer<'a> {
     buf: usize,
-    handles: Vec<Handle>,
+    handles: Vec<Handle<'a>>,
     contents: Vec<Content>
 }
 
-impl Deserializer {
+impl<'a> Deserializer<'a> {
 
     pub fn new (&self) -> Self {
         let buf: usize = 0;
@@ -327,8 +327,8 @@ impl Deserializer {
             TC_LONGSTRING => read_new_string(bytes)?,
             TC_ENUM => read_new_enum(bytes)?,
             TC_CLASSDESC => read_new_class_desc(bytes)?,
-            TC_PROXYCLASSDESC => read_new_proxy_class_desc(bytes)?,
-            TC_REFERENCE => return Err(DeserializeError::Unimplemented(String::from("References"))),
+            TC_PROXYCLASSDESC => read_new_class_desc(bytes)?,
+            TC_REFERENCE => read_reference(bytes)?,
             TC_NULL => Object::Null,
             TC_EXCEPTION => return Err(DeserializeError::Unimplemented(String::from("Exceptions"))),
             TC_RESET => return Err(DeserializeError::Unimplemented(String::from("Resets"))),
@@ -345,7 +345,7 @@ impl Deserializer {
 
         let class_desc: ClassDesc = read_class_desc(bytes)?;
         let mut new_object: NewObject = NewObject {class_desc: class_desc, class_data: None};
-        self.handles.push(Handle::NewObject(new_object));
+        //self.handles.push(Handle::NewObject(&new_object));
         new_object.class_data = Some(read_class_data(bytes)?);
 
         return Ok(new_object);
@@ -358,7 +358,7 @@ impl Deserializer {
 
         let class_desc: ClassDesc = read_class_desc(bytes)?;
         let new_class: NewClass = NewClass { class_desc: class_desc };
-        self.handles.push(Handle::NewClass(new_class));
+        //self.handles.push(Handle::NewClass(&new_class));
 
         return Ok(new_class)
     }
@@ -369,7 +369,7 @@ impl Deserializer {
 
         let class_desc: ClassDesc = read_class_desc(bytes)?;
         let mut new_array: NewArray = NewArray { class_desc: class_desc, size: None, values: None };
-        self.handles.push(Handle::NewArray(new_array));
+        //self.handles.push(Handle::NewArray(&new_array));
 
         new_array.size = Some(i32_fs(self.buf, bytes));
         self.buf += 4;
@@ -388,6 +388,81 @@ impl Deserializer {
     }
 
     pub fn read_new_string (&mut self, bytes: &[u8]) -> Result<NewString,DeserializeError> {
-        
+        match bytes[self.buf] {
+            TC_STRING => {
+                let mut new_string: NewString = NewString::String(None);
+                //self.handles.push(Handle::NewString(&new_string));
+                self.buf += 1;
+                let sh: i16 = i16_fs(self.buf, bytes);
+                self.buf += 2;
+                new_string = NewString::String(Some(str_fs(self.buf, bytes, sh as i32)));
+                self.buf += sh as usize;
+                Ok(new_string)
+            },
+            TC_LONGSTRING => {
+                let mut new_string: NewString = NewString::LongString(None);
+                //self.handles.push(Handle::NewString(&new_string));
+                self.buf += 1;
+                let int: i32 = i32_fs(self.buf, bytes);
+                self.buf += 4;
+                new_string = NewString::String(Some(str_fs(self.buf, bytes, int)));
+                self.buf += int as usize;
+                Ok(new_string)
+            },
+            _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf]))
+        }
+
+    }
+
+    pub fn read_new_enum (&mut self, bytes: &[u8]) -> Result<NewEnum,DeserializeError> {
+        if bytes[self.buf] != TC_ENUM { return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf])) }
+        self.buf += 1;
+
+        let class_desc: ClassDesc = read_class_desc(bytes)?;
+        let new_enum: NewEnum = NewEnum { class_desc: class_desc, enum_constant_name: None };
+        //self.handles.push(Handle::NewString(&new_enum));
+        new_enum.enum_constant_name = Some(self.get_string(bytes)?); //For strings of this type, are they utf?
+        Ok(new_enum);
+    }
+
+    /*pub enum NewClassDesc {
+        ClassDesc(
+            //TC_CLASSDESC 
+            String, //className 
+            i64, //serialVersionUID
+            //newHandle
+            Option<ClassDescInfo>
+        ),
+        ProxyClassDesc (
+            //TC_PROXYCLASSDESC
+            //newHandle
+            Option<ProxyClassDescInfo>
+        )
+    }*/
+
+    pub fn read_new_class_desc (&mut self, bytes: &[u8]) -> Result<NewClassDesc,DeserializeError> {
+
+    }
+
+    pub fn get_string (&mut self, bytes: &[u8]) -> Result<String,DeserializeError> {
+        match bytes[self.buf] {
+            TC_STRING => {
+                self.buf += 1;
+                let sh: i16 = i16_fs(self.buf, bytes);
+                self.buf += 2;
+                let string: String = str_fs(self.buf, bytes, sh as i32);
+                self.buf += sh as usize;
+                Ok(string)
+            },
+            TC_LONGSTRING => {
+                self.buf += 1;
+                let int: i32 = i32_fs(self.buf, bytes);
+                self.buf += 4;
+                let string: String = str_fs(self.buf, bytes, int);
+                self.buf += int as usize;
+                Ok(string)
+            },
+            _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf]))
+        }
     }
 }
