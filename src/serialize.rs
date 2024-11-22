@@ -5,7 +5,7 @@
  * Handle Exceptions TC_EXCEPTION
  */
 
-use crate::from_stream::i16_fs;
+use crate::from_stream::{i16_fs,i32_fs};
 use thiserror::Error;
 
 pub const STREAM_MAGIC: i16 = 0xAC_ED;
@@ -53,7 +53,7 @@ pub enum Object {
     PrevObject(i32), //TC_REFERENCE && Handle
     Null, //TC_NULL
     Exception, //TC_EXCEPTION how does this work????
-    Reset, //TC_RESET
+    Reset, //TC_RESET how does this work????
 }
 
 #[derive(Clone)]
@@ -67,7 +67,7 @@ pub struct NewObject {
     //TC_OBJECT
     class_desc: ClassDesc,
     //newHandle
-    classdata: ClassData
+    class_data: Option<ClassData>
 }
 
 #[derive(Clone)]
@@ -82,8 +82,8 @@ pub struct NewArray {
     //TC_ARRAY
     class_desc: ClassDesc,
     //newHandle
-    size: i32,
-    array: Vec<Value>
+    size: Option<i32>,
+    values: Option<Vec<Value>>
 }
 
 #[derive(Clone)]
@@ -91,12 +91,12 @@ pub enum NewString {
     String(
        //TC_STRING
        //newHandle
-       String //When decoding, the first 2 bytes are used to determine length of string
+       Option<String> //When decoding, the first 2 bytes are used to determine length of string
     ),
     LongString(
         //TC_LONGSTRING
         //newHandle
-        String //When decoding, the first 8 bytes are used to determine length of string
+        Option<String> //When decoding, the first 8 bytes are used to determine length of string
      )
 }
 
@@ -105,7 +105,7 @@ pub struct NewEnum {
     //TC_ENUM
     class_desc: ClassDesc,
     //newHandle
-    enum_constant_name: String
+    enum_constant_name: Option<String>
 }
 
 #[derive(Clone)]
@@ -115,12 +115,12 @@ pub enum NewClassDesc {
         String, //className 
         i64, //serialVersionUID
         //newHandle
-        ClassDescInfo
+        Option<ClassDescInfo>
     ),
     ProxyClassDesc (
         //TC_PROXYCLASSDESC
         //newHandle
-        ProxyClassDescInfo
+        Option<ProxyClassDescInfo>
     )
 }
 
@@ -140,9 +140,9 @@ pub struct BlockDataLong {
 
 #[derive(Clone)]
 pub enum ClassDesc {
-    NewClassDesc,
+    NewClassDesc(NewClassDesc),
     Null,
-    PrevObject
+    PrevObject(i32), //TC_REFERENCE && Handle
 }
 
 #[derive(Clone)]
@@ -162,7 +162,7 @@ pub struct ClassDescInfo {
     class_desc_flags: u8,
     fields: Fields,
     class_annotation: ClassAnnotation,
-    super_class_desc: ClassDesc
+    super_class_desc: Box<ClassDesc>
 }
 
 #[derive(Clone)]
@@ -170,7 +170,7 @@ pub struct ProxyClassDescInfo {
     count: i32,
     proxy_interface_names: Vec<String>, //Array length is count
     class_annotation: ClassAnnotation,
-    super_class_desc: ClassDesc
+    super_class_desc: Box<ClassDesc>
 }
 
 #[derive(Clone)]
@@ -190,7 +190,7 @@ pub enum ExternalContent {
 
 #[derive(Clone)]
 pub struct Fields {
-    count: u16,
+    count: i16,
     field_descs: Vec<FieldDesc> //Array length is count
 }
 
@@ -249,7 +249,10 @@ pub enum DeserializeError {
     InvalidVersion(i16),
 
     #[error("Invalid Object Typecode Found: {0}")]
-    InvalidObjectTypecode(u8)
+    InvalidObjectTypecode(u8),
+
+    #[error("Genuine Apologies, but {0} has not be implemented yet because I am confused...")]
+    Unimplemented(String)
 }
 
 pub struct Deserializer {
@@ -313,5 +316,78 @@ impl Deserializer {
         };
         self.contents.push(content);
         Ok(());
+    }
+
+    pub fn read_object (&mut self, bytes: &[u8]) -> Result<Object,DeserializeError> {
+        let object: Object = match bytes[self.buf] {
+            TC_OBJECT => read_new_object(bytes)?,
+            TC_CLASS => read_new_class(bytes)?,
+            TC_ARRAY => read_new_array(bytes)?,
+            TC_STRING => read_new_string(bytes)?,
+            TC_LONGSTRING => read_new_string(bytes)?,
+            TC_ENUM => read_new_enum(bytes)?,
+            TC_CLASSDESC => read_new_class_desc(bytes)?,
+            TC_PROXYCLASSDESC => read_new_proxy_class_desc(bytes)?,
+            TC_REFERENCE => return Err(DeserializeError::Unimplemented(String::from("References"))),
+            TC_NULL => Object::Null,
+            TC_EXCEPTION => return Err(DeserializeError::Unimplemented(String::from("Exceptions"))),
+            TC_RESET => return Err(DeserializeError::Unimplemented(String::from("Resets"))),
+            _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf]))
+            
+        };
+
+        return Ok(object);
+    }
+
+    pub fn read_new_object (&mut self, bytes: &[u8]) -> Result<NewObject,DeserializeError> {
+        if bytes[self.buf] != TC_OBJECT { return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf])) }
+        self.buf += 1;
+
+        let class_desc: ClassDesc = read_class_desc(bytes)?;
+        let mut new_object: NewObject = NewObject {class_desc: class_desc, class_data: None};
+        self.handles.push(Handle::NewObject(new_object));
+        new_object.class_data = Some(read_class_data(bytes)?);
+
+        return Ok(new_object);
+    }
+
+    pub fn read_new_class (&mut self, bytes: &[u8]) -> Result<NewClass,DeserializeError> {
+
+        if bytes[self.buf] != TC_CLASS { return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf])) }
+        self.buf += 1;
+
+        let class_desc: ClassDesc = read_class_desc(bytes)?;
+        let new_class: NewClass = NewClass { class_desc: class_desc };
+        self.handles.push(Handle::NewClass(new_class));
+
+        return Ok(new_class)
+    }
+
+    pub fn read_new_array (&mut self, bytes: &[u8]) -> Result<NewArray,DeserializeError> {
+        if bytes[self.buf] != TC_ARRAY { return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf])) }
+        self.buf += 1;
+
+        let class_desc: ClassDesc = read_class_desc(bytes)?;
+        let mut new_array: NewArray = NewArray { class_desc: class_desc, size: None, values: None };
+        self.handles.push(Handle::NewArray(new_array));
+
+        new_array.size = Some(i32_fs(self.buf, bytes));
+        self.buf += 4;
+
+        let values: Vec<Value> = Vec::new();
+        for i in 0..new_array.size.unwrap() {
+            //Implement when read_class_desc is implemented
+            //Check to make sure the fields aren't out of bounds with our index
+            //Determine what type the Value should be from fields
+            //Extract the value (This should also move the buffer up so we shouldn't need to change the buffer here)
+            //Push the value into vec
+        }
+        new_array.values = Some(values);
+
+        return Ok (new_array);
+    }
+
+    pub fn read_new_string (&mut self, bytes: &[u8]) -> Result<NewString,DeserializeError> {
+        
     }
 }
