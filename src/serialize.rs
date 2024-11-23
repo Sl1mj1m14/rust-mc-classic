@@ -34,13 +34,18 @@ pub const SC_SERIALIZABLE: u8 = 0x02;
 pub const SC_EXTERNALIZABLE: u8 = 0x04;
 pub const SC_ENUM: u8 = 0x10;
 
-//pub buf: usize = 0;
-//pub contents: Vec<Content> = Vec::new();
-
 #[derive(Clone)]
 pub enum Content {
     Object(Object),
     BlockData(BlockData)
+}
+
+impl Content {
+    pub fn get_object (self) -> Result<Object,DeserializeError> {
+        match self {
+            
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -462,7 +467,7 @@ impl<'a> Deserializer<'a> {
                 self.buf += 8;
                 let mut new_class_desc: NewClassDesc = NewClassDesc::ClassDesc(class_name, serial_version_uuid, None);
                 //self.handles.push(Handle::NewClassDesc(&new_class_desc));
-                let class_desc_info: ClassDescInfo = self.read_class_desc_info(bytes);
+                let class_desc_info: ClassDescInfo = self.read_class_desc_info(bytes)?;
                 new_class_desc = NewClassDesc::ClassDesc(class_name, serial_version_uuid, Some(class_desc_info));
                 Ok(new_class_desc)
             },
@@ -470,7 +475,7 @@ impl<'a> Deserializer<'a> {
                 self.buf += 1;
                 let mut new_proxy_class_desc: NewClassDesc = NewClassDesc::ProxyClassDesc(None);
                 //self.handles.push(Handle::NewClassDesc(&new_proxy_class_desc));
-                let proxy_class_desc_info: ProxyClassDescInfo = self.read_proxy_class_desc_info(bytes);
+                let proxy_class_desc_info: ProxyClassDescInfo = self.read_proxy_class_desc_info(bytes)?;
                 new_proxy_class_desc = NewClassDesc::ProxyClassDesc(Some(proxy_class_desc_info));
                 Ok(new_proxy_class_desc)
             },
@@ -506,8 +511,58 @@ impl<'a> Deserializer<'a> {
         ObjectAnnotation(ObjectAnnotation)
     }*/
 
-    pub fn read_class_data (&mut self, bytes: &[u8]) -> Result<ClassData,DeserializeError> {
+    pub fn read_class_data (&mut self, bytes: &[u8], class_desc_info: ClassDescInfo) -> Result<ClassData,DeserializeError> {
+        match flag {
+            SC_WRITE_METHOD => {
+                let values: Vec<Value> = Vec::new();
+                Ok(ClassData::WrClass((), ()))
+            },
+            SC_BLOCK_DATA => {},
+            SC_SERIALIZABLE => {},
+            SC_EXTERNALIZABLE => {},
+            SC_ENUM => return Err(DeserializeError::Unimplemented(String::from("Serialized Enums"))),
+            _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf], self.buf))
 
+        }
+    }
+
+    pub fn read_class_desc_info (&mut self, bytes: &[u8]) -> Result<ClassDescInfo,DeserializeError> {
+
+        let flag: u8 = bytes[self.buf];
+        self.buf += 1;
+        let fields: Fields = self.read_fields(bytes)?;
+        let class_annotation: ClassAnnotation = self.read_class_annotation(bytes)?;
+        let super_class_description: ClassDesc = self.read_class_desc(bytes)?;
+
+        Ok(ClassDescInfo { 
+            class_desc_flags: flag,
+            fields: fields,
+            class_annotation: class_annotation,
+            super_class_desc: Box::new(super_class_description) 
+        })
+
+    }
+
+    pub fn read_proxy_class_desc_info (&mut self, bytes: &[u8]) -> Result<ProxyClassDescInfo,DeserializeError> {
+
+        let count: i32 = i32_fs(self.buf, bytes);
+        self.buf += 4;
+
+        let mut proxy_interface_names: Vec<String> = Vec::new();
+        for _ in 0..count {
+            let mut string: String  = self.get_string(bytes)?;
+            proxy_interface_names.push(string);
+        }
+
+        let class_annotation: ClassAnnotation = self.read_class_annotation(bytes)?;
+        let super_class_description: ClassDesc = self.read_class_desc(bytes)?;
+
+        Ok(ProxyClassDescInfo { 
+            count: count,
+            proxy_interface_names: proxy_interface_names,
+            class_annotation: class_annotation,
+            super_class_desc: Box::new(super_class_description) 
+        })
     }
 
     pub fn get_string (&mut self, bytes: &[u8]) -> Result<String,DeserializeError> {
