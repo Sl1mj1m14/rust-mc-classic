@@ -3,7 +3,7 @@ mod from_stream;
 
 use flate2::read::GzDecoder;
 use from_stream::{i16_fs, i64_fs, str_fs, u16_fs, u32_fs};
-use serialize::deserialize;
+use serialize::Deserializer;
 
 use std::fmt::Error; //Temporary error until serializer implements it's own
 use std::fs::read;
@@ -172,7 +172,10 @@ pub fn classic_to_level (bytes: Vec<u8>) -> Result<Level, Error> {
     level.version = Some(bytes[buf as usize]);
     buf += 1;
 
-    deserialize(&bytes[buf..]);
+    let mut deserializer: Deserializer = Deserializer::new();
+    let contents = deserializer.deserialize(&bytes[buf..]);
+
+    println!("{:?}",contents);
 
     return Ok(level);
 

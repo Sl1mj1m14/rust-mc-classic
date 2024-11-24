@@ -1,16 +1,17 @@
 /**
  * To Do:
+ * Fix all instance of getting strings
  * Make Handle Map (somehow...)
  * Understand Arrays
  * Handle Exceptions TC_EXCEPTION
  * Handle Resets
  */
 
-use crate::from_stream::{i16_fs,i32_fs,i64_fs,str_fs};
+use crate::from_stream::{u16_fs,u32_fs,u64_fs,i16_fs,i32_fs,i64_fs,str_fs};
 use thiserror::Error;
 
-pub const STREAM_MAGIC: i16 = 0xAC_ED;
-pub const STREAM_VERSION: i16 = 0x00_05;
+pub const STREAM_MAGIC: u16 = 0xAC_ED;
+pub const STREAM_VERSION: u16 = 0x00_05;
 pub const TC_NULL: u8 = 0x70;
 pub const TC_REFERENCE: u8 = 0x71;
 pub const TC_CLASSDESC: u8 = 0x72;
@@ -34,21 +35,29 @@ pub const SC_SERIALIZABLE: u8 = 0x02;
 pub const SC_EXTERNALIZABLE: u8 = 0x04;
 pub const SC_ENUM: u8 = 0x10;
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub enum Content {
     Object(Object),
     BlockData(BlockData)
 }
 
 impl Content {
-    pub fn get_object (self) -> Result<Object,DeserializeError> {
+    pub fn get_object (&self) -> Result<Object,DeserializeError> {
         match self {
-            
+            Content::Object(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_block_data (&self) -> Result<BlockData,DeserializeError> {
+        match self {
+            Content::BlockData(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub enum Object {
     NewObject(NewObject),
     NewClass(NewClass),
@@ -56,19 +65,100 @@ pub enum Object {
     NewString(NewString), 
     NewEnum(NewEnum),
     NewClassDesc(NewClassDesc),
-    PrevObject(i32), //TC_REFERENCE && Handle
+    //TC_REFERENCE
     Null, //TC_NULL
     Exception, //TC_EXCEPTION how does this work????
     Reset, //TC_RESET how does this work????
 }
 
-#[derive(Clone)]
+impl Object {
+    pub fn get_new_object (&self) -> Result<NewObject,DeserializeError> {
+        match self {
+            Object::NewObject(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_new_class (&self) -> Result<NewClass,DeserializeError> {
+        match self {
+            Object::NewClass(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_new_array (&self) -> Result<NewArray,DeserializeError> {
+        match self {
+            Object::NewArray(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_new_string (&self) -> Result<NewString,DeserializeError> {
+        match self {
+            Object::NewString(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_new_enum (&self) -> Result<NewEnum,DeserializeError> {
+        match self {
+            Object::NewEnum(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_new_class_desc (&self) -> Result<NewClassDesc,DeserializeError> {
+        match self {
+            Object::NewClassDesc(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_null (&self) -> Result<(),DeserializeError> {
+        match self {
+            Object::Null => Ok(()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_exception (&self) -> Result<(),DeserializeError> {
+        match self {
+            Object::Exception => return Err(DeserializeError::Unimplemented(String::from("Exceptions"))),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_reset (&self) -> Result<(),DeserializeError> {
+        match self {
+            Object::Reset => return Err(DeserializeError::Unimplemented(String::from("Resets"))),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+}
+
+#[derive(Clone,Debug)]
 pub enum BlockData {
     BlockDataShort(BlockDataShort), 
     BlockDataLong(BlockDataLong)
 }
 
-#[derive(Clone)]
+impl BlockData {
+    pub fn get_block_data_short (&self) -> Result<BlockDataShort,DeserializeError> {
+        match self {
+            BlockData::BlockDataShort(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_block_data_long (&self) -> Result<BlockDataLong,DeserializeError> {
+        match self {
+            BlockData::BlockDataLong(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+}
+
+#[derive(Clone,Debug)]
 pub struct NewObject {
     //TC_OBJECT
     class_desc: ClassDesc,
@@ -76,14 +166,14 @@ pub struct NewObject {
     class_data: Option<ClassData>
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct NewClass {
     //TC_CLASS
     class_desc: ClassDesc
     //newHandle
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct NewArray {
     //TC_ARRAY
     class_desc: ClassDesc,
@@ -92,21 +182,15 @@ pub struct NewArray {
     values: Option<Vec<Value>>
 }
 
-#[derive(Clone)]
-pub enum NewString {
-    String(
-       //TC_STRING
-       //newHandle
-       Option<String> //When decoding, the first 2 bytes are used to determine length of string
-    ),
-    LongString(
-        //TC_LONGSTRING
-        //newHandle
-        Option<String> //When decoding, the first 8 bytes are used to determine length of string
-     )
+#[derive(Clone,Debug)]
+pub struct NewString {
+    //TC_LONGSTRING || TC_STRING
+    //newHandle
+    //When decoding, the first [8 bytes if Long | 2 bytes if short] are used to determine length of string
+    string: Option<String> 
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct NewEnum {
     //TC_ENUM
     class_desc: ClassDesc,
@@ -114,7 +198,7 @@ pub struct NewEnum {
     enum_constant_name: Option<String>
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub enum NewClassDesc {
     ClassDesc(
         //TC_CLASSDESC 
@@ -130,28 +214,79 @@ pub enum NewClassDesc {
     )
 }
 
-#[derive(Clone)]
+impl NewClassDesc {
+    pub fn get_class_name (&self) -> Result<String,DeserializeError> {
+        match self {
+            NewClassDesc::ClassDesc(
+                string, _, _ 
+            ) => Ok(string.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_serial_version_uuid (&self) -> Result<i64,DeserializeError> {
+        match self {
+            NewClassDesc::ClassDesc(
+                _, uuid, _ 
+            ) => Ok(uuid.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_class_desc_info (&self) -> Result<Option<ClassDescInfo>,DeserializeError> {
+        match self {
+            NewClassDesc::ClassDesc(
+                _, _, class_desc_info 
+            ) => Ok(class_desc_info.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_proxy_class_desc_info (&self) -> Result<Option<ProxyClassDescInfo>,DeserializeError> {
+        match self {
+            NewClassDesc::ProxyClassDesc(class_desc_info) => Ok(class_desc_info.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+}
+
+#[derive(Clone,Debug)]
 pub struct BlockDataShort {
     //TC_BLOCKDATA
     size: u8,
     block_data: Vec<u8>
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct BlockDataLong {
     //TC_BLOCKDATALONG
     size: i32,
     block_data: Vec<u8> //Array length is size
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub enum ClassDesc {
     NewClassDesc(NewClassDesc),
-    Null,
-    PrevObject(i32), //TC_REFERENCE && Handle
+    Null
 }
 
-#[derive(Clone)]
+impl ClassDesc {
+    pub fn get_new_class_desc (&self) -> Result<NewClassDesc,DeserializeError> {
+        match self {
+            ClassDesc::NewClassDesc(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_null (&self) -> Result<(),DeserializeError> {
+        match self {
+            ClassDesc::Null => Ok(()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+}
+
+#[derive(Clone,Debug)]
 pub enum ClassData {
     // SC_SERIALIZABLE & classDescFlag && !(SC_WRITE_METHOD & classDescFlags)
     NoWrClass(Vec<Value>), 
@@ -163,7 +298,32 @@ pub enum ClassData {
     ObjectAnnotation(ObjectAnnotation)
 }
 
-#[derive(Clone)]
+impl ClassData {
+    pub fn get_values (&self) -> Result<Vec<Value>,DeserializeError> {
+        match self {
+            ClassData::NoWrClass(value) => Ok(value.clone()),
+            ClassData::WrClass(value,_) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_object_annotation (&self) -> Result<ObjectAnnotation,DeserializeError> {
+        match self {
+            ClassData::ObjectAnnotation(value) => Ok(value.clone()),
+            ClassData::WrClass(_,value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_external_contents (&self) -> Result<Vec<ExternalContent>,DeserializeError> {
+        match self {
+            ClassData::ExternalContents(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+}
+
+#[derive(Clone,Debug)]
 pub struct ClassDescInfo {
     class_desc_flags: u8,
     fields: Fields,
@@ -171,7 +331,7 @@ pub struct ClassDescInfo {
     super_class_desc: Box<ClassDesc>
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct ProxyClassDescInfo {
     count: i32,
     proxy_interface_names: Vec<String>, //Array length is count
@@ -179,7 +339,7 @@ pub struct ProxyClassDescInfo {
     super_class_desc: Box<ClassDesc>
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub enum ObjectAnnotation {
     EndBlockData, //TC_ENDBLOCKDATA
     Contents(
@@ -188,19 +348,51 @@ pub enum ObjectAnnotation {
     )
 }
 
-#[derive(Clone)]
+impl ObjectAnnotation {
+    pub fn get_contents (&self) -> Result<Vec<Content>,DeserializeError> {
+        match self {
+            ObjectAnnotation::Contents(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_end_block_data (&self) -> Result<(),DeserializeError> {
+        match self {
+            ObjectAnnotation::EndBlockData => Ok(()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+}
+
+#[derive(Clone,Debug)]
 pub enum ExternalContent {
     Bytes(Vec<u8>),
     Object(Object)
 }
 
-#[derive(Clone)]
+impl ExternalContent {
+    pub fn get_bytes (&self) -> Result<Vec<u8>,DeserializeError> {
+        match self {
+            ExternalContent::Bytes(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_object (&self) -> Result<Object,DeserializeError> {
+        match self {
+            ExternalContent::Object(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+}
+
+#[derive(Clone,Debug)]
 pub struct Fields {
     count: i16,
     field_descs: Vec<FieldDesc> //Array length is count
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub enum ClassAnnotation {
     EndBlockData, //TC_ENDBLOCKDATA
     Contents(
@@ -209,7 +401,23 @@ pub enum ClassAnnotation {
     )
 }
 
-#[derive(Clone)]
+impl ClassAnnotation {
+    pub fn get_contents (&self) -> Result<Vec<Content>,DeserializeError> {
+        match self {
+            ClassAnnotation::Contents(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_end_block_data (&self) -> Result<(),DeserializeError> {
+        match self {
+            ClassAnnotation::EndBlockData => Ok(()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+}
+
+#[derive(Clone,Debug)]
 pub enum FieldDesc {
     PrimitiveDesc(
         char,   //prim_typecode
@@ -222,7 +430,30 @@ pub enum FieldDesc {
     )
 }
 
-#[derive(Clone)]
+impl FieldDesc {
+    pub fn get_typecode (&self) -> Result<char,DeserializeError> {
+        match self {
+            FieldDesc::PrimitiveDesc(char,_) => Ok(char.clone()),
+            FieldDesc::ObjectDesc(char,_,_) => Ok(char.clone())
+        }
+    }
+
+    pub fn get_field_name (&self) -> Result<String,DeserializeError> {
+        match self {
+            FieldDesc::PrimitiveDesc(_,name) => Ok(name.clone()),
+            FieldDesc::ObjectDesc(_,name,_) => Ok(name.clone())
+        }
+    }
+
+    pub fn get_field_type (&self) -> Result<String,DeserializeError> {
+        match self {
+            FieldDesc::ObjectDesc(_,_,ftype) => Ok(ftype.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+}
+
+#[derive(Clone,Debug)]
 pub enum Value {
     Byte(u8),
     Char(char),
@@ -232,27 +463,92 @@ pub enum Value {
     Short(i16),
     Long(i64),
     Boolean(bool),
-    Array, //How do arrays work???
+    Array(Vec<Value>), //How do arrays work???
     Object(Object)
 }
 
-#[derive(Clone)]
-pub enum Handle<'a> {
-    NewClass(&'a NewClass),
-    NewClassDesc(&'a NewClassDesc),
-    NewArray(&'a NewArray),
-    NewObject(&'a NewObject),
-    NewString(&'a NewString),
-    NewEnum(&'a NewEnum)
+impl Value {
+    pub fn get_byte (&self) -> Result<u8,DeserializeError> {
+        match self {
+            Value::Byte(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_char (&self) -> Result<char,DeserializeError> {
+        match self {
+            Value::Char(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_double (&self) -> Result<u64,DeserializeError> {
+        match self {
+            Value::Double(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_float (&self) -> Result<u32,DeserializeError> {
+        match self {
+            Value::Float(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_integer (&self) -> Result<i32,DeserializeError> {
+        match self {
+            Value::Integer(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_short (&self) -> Result<i16,DeserializeError> {
+        match self {
+            Value::Short(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_long (&self) -> Result<i64,DeserializeError> {
+        match self {
+            Value::Long(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_boolean (&self) -> Result<bool,DeserializeError> {
+        match self {
+            Value::Boolean(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_array (&self) -> Result<Vec<Value>,DeserializeError> {
+        match self {
+            Value::Array(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
+
+    pub fn get_object (&self) -> Result<Object,DeserializeError> {
+        match self {
+            Value::Object(value) => Ok(value.clone()),
+            _ => Err(DeserializeError::InvalidEnumValue())
+        }
+    }
 }
 
 #[derive(Error, Debug)]
 pub enum DeserializeError {
+    #[error("Invalid Enum Value Returned")]
+    InvalidEnumValue(),
+
     #[error("Invalid Magic Number: Expected {STREAM_MAGIC} & Found {0}")]
-    InvalidMagic(i16),
+    InvalidMagic(u16),
 
     #[error("Invalid Version Number: Expected {STREAM_VERSION} & Found {0}")]
-    InvalidVersion(i16),
+    InvalidVersion(u16),
 
     #[error("Invalid Object Typecode Found: {0} at buffer {1}")]
     InvalidObjectTypecode(u8,usize),
@@ -264,17 +560,18 @@ pub enum DeserializeError {
     Unimplemented(String)
 }
 
-pub struct Deserializer<'a> {
+#[derive(Clone,Debug)]
+pub struct Deserializer {
     buf: usize,
-    handles: Vec<Handle<'a>>,
+    handles: Vec<Object>,
     contents: Vec<Content>
 }
 
-impl<'a> Deserializer<'a> {
+impl Deserializer {
 
-    pub fn new (&self) -> Self {
+    pub fn new () -> Self {
         let buf: usize = 0;
-        let handles: Vec<Handle> = Vec::new();
+        let handles: Vec<Object> = Vec::new();
         let contents: Vec<Content> = Vec::new();
         
         Deserializer {
@@ -286,12 +583,12 @@ impl<'a> Deserializer<'a> {
 
     pub fn deserialize (&mut self, bytes: &[u8]) -> Result<Vec<Content>,DeserializeError> {
         //Checking for valid stream magic number
-        let magic: i16 = i16_fs(self.buf, bytes);
+        let magic: u16 = u16_fs(self.buf, bytes);
         self.buf += 2;
         if magic != STREAM_MAGIC {return Err(DeserializeError::InvalidMagic(magic))}
 
         //Checking for valid stream version number
-        let version: i16 = i16_fs(self.buf, bytes);
+        let version: u16 = u16_fs(self.buf, bytes);
         self.buf += 2;
         if version != STREAM_VERSION {return Err(DeserializeError::InvalidVersion(version))}
 
@@ -301,11 +598,14 @@ impl<'a> Deserializer<'a> {
     }
 
     pub fn read_contents (&mut self, bytes: &[u8]) -> Result<(),DeserializeError> {
-        while self.buf < bytes.len() {self.read_content(bytes)?}
+        while self.buf < bytes.len() {
+            let content: Content = self.read_content(bytes)?;
+            self.contents.push(content);
+        }
         Ok(())
     }
 
-    pub fn read_content (&mut self, bytes: &[u8]) -> Result<(),DeserializeError> {
+    pub fn read_content (&mut self, bytes: &[u8]) -> Result<Content,DeserializeError> {
         let content: Content = match bytes[self.buf] {
             TC_OBJECT => Content::Object(self.read_object(bytes)?),
             TC_CLASS => Content::Object(self.read_object(bytes)?),
@@ -323,8 +623,8 @@ impl<'a> Deserializer<'a> {
             TC_BLOCKDATALONG => Content::BlockData(self.read_blockdata(bytes)?),
             _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf],self.buf))
         };
-        self.contents.push(content);
-        Ok(())
+        
+        Ok(content)
     }
 
     pub fn read_object (&mut self, bytes: &[u8]) -> Result<Object,DeserializeError> {
@@ -337,7 +637,7 @@ impl<'a> Deserializer<'a> {
             TC_ENUM => Object::NewEnum(self.read_new_enum(bytes)?),
             TC_CLASSDESC => Object::NewClassDesc(self.read_new_class_desc(bytes)?),
             TC_PROXYCLASSDESC => Object::NewClassDesc(self.read_new_class_desc(bytes)?),
-            TC_REFERENCE => Object::PrevObject(self.read_reference(bytes)?),
+            TC_REFERENCE => self.read_reference(bytes)?,
             TC_NULL => { self.buf += 1; Object::Null },
             TC_EXCEPTION => return Err(DeserializeError::Unimplemented(String::from("Exceptions"))),
             TC_RESET => return Err(DeserializeError::Unimplemented(String::from("Resets"))),
@@ -377,11 +677,18 @@ impl<'a> Deserializer<'a> {
         self.buf += 1;
 
         let class_desc: ClassDesc = self.read_class_desc(bytes)?;
-        let mut new_object: NewObject = NewObject {class_desc: class_desc, class_data: None};
-        //self.handles.push(Handle::NewObject(&new_object));
-        new_object.class_data = Some(self.read_class_data(bytes)?);
+        let mut new_object: NewObject = NewObject {class_desc: class_desc.clone(), class_data: None};
 
-        return Ok(new_object);
+        let index: usize = self.handles.len();
+        self.handles.push(Object::NewObject(new_object.clone()));
+
+        let class_desc_info: ClassDescInfo = class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap();
+
+        new_object.class_data = Some(self.read_class_data(bytes,class_desc_info)?);
+
+        self.handles[index] = Object::NewObject(new_object.clone());
+
+        Ok(new_object)
     }
 
     pub fn read_new_class (&mut self, bytes: &[u8]) -> Result<NewClass,DeserializeError> {
@@ -391,9 +698,10 @@ impl<'a> Deserializer<'a> {
 
         let class_desc: ClassDesc = self.read_class_desc(bytes)?;
         let new_class: NewClass = NewClass { class_desc: class_desc };
-        //self.handles.push(Handle::NewClass(&new_class));
 
-        return Ok(new_class)
+        self.handles.push(Object::NewClass(new_class.clone()));
+
+        Ok(new_class)
     }
 
     pub fn read_new_array (&mut self, bytes: &[u8]) -> Result<NewArray,DeserializeError> {
@@ -402,7 +710,9 @@ impl<'a> Deserializer<'a> {
 
         let class_desc: ClassDesc = self.read_class_desc(bytes)?;
         let mut new_array: NewArray = NewArray { class_desc: class_desc, size: None, values: None };
-        //self.handles.push(Handle::NewArray(&new_array));
+        
+        let index: usize = self.handles.len();
+        self.handles.push(Object::NewArray(new_array.clone()));
 
         new_array.size = Some(i32_fs(self.buf, bytes));
         self.buf += 4;
@@ -417,29 +727,43 @@ impl<'a> Deserializer<'a> {
         }
         new_array.values = Some(values);
 
-        return Ok (new_array);
+        self.handles[index] = Object::NewArray(new_array.clone());
+
+        Ok(new_array)
     }
 
     pub fn read_new_string (&mut self, bytes: &[u8]) -> Result<NewString,DeserializeError> {
         match bytes[self.buf] {
             TC_STRING => {
-                let mut new_string: NewString = NewString::String(None);
-                //self.handles.push(Handle::NewString(&new_string));
                 self.buf += 1;
+                let mut new_string: NewString = NewString {string: None};
+
+                let index: usize = self.handles.len();
+                self.handles.push(Object::NewString(new_string.clone()));
+
                 let sh: i16 = i16_fs(self.buf, bytes);
                 self.buf += 2;
-                new_string = NewString::String(Some(str_fs(self.buf, bytes, sh as i32)));
+                new_string = NewString{string: Some(str_fs(self.buf, bytes, sh as i32))};
                 self.buf += sh as usize;
+
+                self.handles[index] = Object::NewString(new_string.clone());
+
                 Ok(new_string)
             },
             TC_LONGSTRING => {
-                let mut new_string: NewString = NewString::LongString(None);
-                //self.handles.push(Handle::NewString(&new_string));
                 self.buf += 1;
+                let mut new_string: NewString = NewString {string: None};
+
+                let index: usize = self.handles.len();
+                self.handles.push(Object::NewString(new_string.clone()));
+
                 let int: i32 = i32_fs(self.buf, bytes);
                 self.buf += 4;
-                new_string = NewString::String(Some(str_fs(self.buf, bytes, int)));
+                new_string = NewString {string: Some(str_fs(self.buf, bytes, int))};
                 self.buf += int as usize;
+
+                self.handles[index] = Object::NewString(new_string.clone());
+
                 Ok(new_string)
             },
             _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf],self.buf))
@@ -453,8 +777,14 @@ impl<'a> Deserializer<'a> {
 
         let class_desc: ClassDesc = self.read_class_desc(bytes)?;
         let mut new_enum: NewEnum = NewEnum { class_desc: class_desc, enum_constant_name: None };
-        //self.handles.push(Handle::NewEnum(&new_enum));
-        new_enum.enum_constant_name = Some(self.get_string(bytes)?); //For strings of this type, are they utf?
+
+        let index = self.handles.len();
+        self.handles.push(Object::NewEnum(new_enum.clone()));
+
+        new_enum.enum_constant_name = Some(self.get_string(bytes)?);
+
+        self.handles[index] = Object::NewEnum(new_enum.clone());
+
         Ok(new_enum)
     }
 
@@ -462,21 +792,38 @@ impl<'a> Deserializer<'a> {
         match bytes[self.buf] {
             TC_CLASSDESC => {
                 self.buf += 1;
-                let class_name: String = self.get_string(bytes)?;
+                let len: i16 = i16_fs(self.buf, bytes);
+                self.buf += 2;
+                let class_name: String = str_fs(self.buf, bytes, len as i32);
+                self.buf += len as usize;
+
                 let serial_version_uuid: i64 = i64_fs(self.buf, bytes);
                 self.buf += 8;
-                let mut new_class_desc: NewClassDesc = NewClassDesc::ClassDesc(class_name, serial_version_uuid, None);
-                //self.handles.push(Handle::NewClassDesc(&new_class_desc));
+
+                let mut new_class_desc: NewClassDesc = NewClassDesc::ClassDesc(class_name.clone(), serial_version_uuid, None);
+
+                let index = self.handles.len();
+                self.handles.push(Object::NewClassDesc(new_class_desc.clone()));
+
                 let class_desc_info: ClassDescInfo = self.read_class_desc_info(bytes)?;
-                new_class_desc = NewClassDesc::ClassDesc(class_name, serial_version_uuid, Some(class_desc_info));
+                new_class_desc = NewClassDesc::ClassDesc(class_name.clone(), serial_version_uuid, Some(class_desc_info));
+
+                self.handles[index] = Object::NewClassDesc(new_class_desc.clone());
+
                 Ok(new_class_desc)
             },
             TC_PROXYCLASSDESC => {
                 self.buf += 1;
                 let mut new_proxy_class_desc: NewClassDesc = NewClassDesc::ProxyClassDesc(None);
-                //self.handles.push(Handle::NewClassDesc(&new_proxy_class_desc));
+
+                let index = self.handles.len();
+                self.handles.push(Object::NewClassDesc(new_proxy_class_desc.clone()));
+
                 let proxy_class_desc_info: ProxyClassDescInfo = self.read_proxy_class_desc_info(bytes)?;
                 new_proxy_class_desc = NewClassDesc::ProxyClassDesc(Some(proxy_class_desc_info));
+
+                self.handles[index] = Object::NewClassDesc(new_proxy_class_desc.clone());
+
                 Ok(new_proxy_class_desc)
             },
             _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf], self.buf))
@@ -485,41 +832,56 @@ impl<'a> Deserializer<'a> {
 
     }
 
-    pub fn read_reference (&mut self, bytes: &[u8]) -> Result<i32,DeserializeError> {
-        //This should eventually return a reference to an existing object, and I'm not entirely sure how to handle that quite yet
-        return Err(DeserializeError::Unimplemented(String::from("Handles")))
+    pub fn read_reference (&mut self, bytes: &[u8]) -> Result<Object,DeserializeError> {
+        if bytes[self.buf] != TC_REFERENCE { return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf],self.buf)) }
+
+        self.buf += 1;
+        let handle: i32 = i32_fs(self.buf, bytes);
+        self.buf += 4;
+
+        let index: usize = (handle - BASE_WIRE_HANDLE) as usize;
+        if index >= self.handles.len() { return Err(DeserializeError::IndexOutOfBounds(index, self.handles.len()))}
+        Ok(self.handles[index].clone())
     }
 
     pub fn read_class_desc (&mut self, bytes: &[u8]) -> Result<ClassDesc,DeserializeError> {
         match bytes[self.buf] {
             TC_CLASSDESC => Ok(ClassDesc::NewClassDesc(self.read_new_class_desc(bytes)?)),
             TC_NULL => { self.buf += 1; Ok(ClassDesc::Null) },
-            TC_REFERENCE => Ok(ClassDesc::PrevObject(self.read_reference(bytes)?)),
+            TC_REFERENCE => Ok(ClassDesc::NewClassDesc(self.read_reference(bytes)?.get_new_class_desc()?)),
             _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf], self.buf))
         }
 
     }
 
-    /*pub enum ClassData {
-        // SC_SERIALIZABLE & classDescFlag && !(SC_WRITE_METHOD & classDescFlags)
-        NoWrClass(Vec<Value>), 
-        // SC_SERIALIZABLE & classDescFlag && SC_WRITE_METHOD & classDescFlags
-        WrClass(Vec<Value>, ObjectAnnotation),
-        // SC_EXTERNALIZABLE & classDescFlag && !(SC_BLOCKDATA  & classDescFlags
-        ExternalContents(Vec<ExternalContent>),
-        // SC_EXTERNALIZABLE & classDescFlag && SC_BLOCKDATA & classDescFlags
-        ObjectAnnotation(ObjectAnnotation)
-    }*/
-
     pub fn read_class_data (&mut self, bytes: &[u8], class_desc_info: ClassDescInfo) -> Result<ClassData,DeserializeError> {
+        let flag: u8 = class_desc_info.class_desc_flags;
         match flag {
             SC_WRITE_METHOD => {
-                let values: Vec<Value> = Vec::new();
-                Ok(ClassData::WrClass((), ()))
+                let mut values: Vec<Value> = Vec::new();
+                let len: i16 = class_desc_info.fields.count;
+                let fields: Vec<FieldDesc> = class_desc_info.fields.field_descs;
+                for i in 0..len as usize {
+                    if i >= fields.len() { return Err(DeserializeError::IndexOutOfBounds(i, fields.len()))}
+                    let code: char = fields[i].get_typecode()?;
+                    values.push(self.read_value(bytes,code)?);
+                }
+                let object_annotation: ObjectAnnotation = self.read_object_annotation(bytes)?;
+                Ok(ClassData::WrClass(values, object_annotation))
             },
-            SC_BLOCK_DATA => {},
-            SC_SERIALIZABLE => {},
-            SC_EXTERNALIZABLE => {},
+            SC_BLOCK_DATA => Ok(ClassData::ObjectAnnotation(self.read_object_annotation(bytes)?)),
+            SC_SERIALIZABLE => {
+                let mut values: Vec<Value> = Vec::new();
+                let len: i16 = class_desc_info.fields.count;
+                let fields: Vec<FieldDesc> = class_desc_info.fields.field_descs;
+                for i in 0..len as usize {
+                    if i >= fields.len() { return Err(DeserializeError::IndexOutOfBounds(i, fields.len()))}
+                    let code: char = fields[i].get_typecode()?;
+                    values.push(self.read_value(bytes,code)?);
+                }
+                Ok(ClassData::NoWrClass(values))
+            },
+            SC_EXTERNALIZABLE => return Err(DeserializeError::Unimplemented(String::from("Externalized Data"))),
             SC_ENUM => return Err(DeserializeError::Unimplemented(String::from("Serialized Enums"))),
             _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf], self.buf))
 
@@ -550,7 +912,10 @@ impl<'a> Deserializer<'a> {
 
         let mut proxy_interface_names: Vec<String> = Vec::new();
         for _ in 0..count {
-            let mut string: String  = self.get_string(bytes)?;
+            let len: i16 = i16_fs(self.buf, bytes);
+            self.buf += 2;
+            let string: String  = str_fs(self.buf, bytes, len as i32);
+            self.buf += len as usize;
             proxy_interface_names.push(string);
         }
 
@@ -563,6 +928,103 @@ impl<'a> Deserializer<'a> {
             class_annotation: class_annotation,
             super_class_desc: Box::new(super_class_description) 
         })
+    }
+
+    pub fn read_value (&mut self, bytes: &[u8], typecode: char) -> Result<Value,DeserializeError> {
+        let value: Value = match typecode {
+            'B' => {
+                let b: u8 = bytes[self.buf];
+                self.buf += 1;
+                Value::Byte(b)
+            },
+            'C' => {
+                let c: char  = bytes[self.buf] as char;
+                self.buf += 1;
+                Value::Char(c)
+            },
+            'D' => {
+                let d: u64 = u64_fs(self.buf, bytes);
+                self.buf += 8;
+                Value::Double(d)
+            },
+            'F' => {
+                let f: u32 = u32_fs(self.buf, bytes);
+                self.buf += 4;
+                Value::Float(f)
+            },
+            'I' => {
+                let i: i32 = i32_fs(self.buf, bytes);
+                self.buf += 4;
+                Value::Integer(i)
+            },
+            'J' => {
+                let j: i64 = i64_fs(self.buf, bytes);
+                self.buf += 8;
+                Value::Long(j)
+            },
+            'S' => {
+                let s: i16 = i16_fs(self.buf, bytes);
+                self.buf += 2;
+                Value::Short(s)
+            },
+            'Z' => {
+                let z: bool = bytes[self.buf] != 0;
+                self.buf += 1;
+                Value::Boolean(z)
+            },
+            '[' =>  return Err(DeserializeError::Unimplemented(String::from("Arrays"))),
+            'L' =>  Value::Object(self.read_object(bytes)?),
+            _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf],self.buf))
+        };
+
+        Ok(value)
+    }
+
+    pub fn read_object_annotation (&mut self, bytes: &[u8]) -> Result<ObjectAnnotation,DeserializeError> {
+        let mut contents: Vec<Content> = Vec::new();
+        while bytes[self.buf] != TC_ENDBLOCKDATA {
+            contents.push(self.read_content(bytes)?);
+        }
+        if contents.len() > 0 {return Ok(ObjectAnnotation::Contents(contents))}
+        Ok(ObjectAnnotation::EndBlockData)
+    }
+
+    pub fn read_fields (&mut self, bytes: &[u8]) -> Result<Fields,DeserializeError> {
+        let count: i16 = i16_fs(self.buf, bytes);
+        self.buf += 2;
+        let mut field_descs = Vec::new();
+        for _ in 0..count {
+            field_descs.push(self.read_field_desc(bytes)?);
+        }
+        Ok(Fields { count: count, field_descs: field_descs })
+    }
+
+    pub fn read_field_desc (&mut self, bytes: &[u8]) -> Result<FieldDesc,DeserializeError> {
+        let typecode: char = bytes[self.buf] as char;
+        self.buf += 1;
+
+        let mut len: i16 = i16_fs(self.buf, bytes);
+        self.buf += 2;
+        let name: String = str_fs(self.buf, bytes, len as i32);
+        self.buf += len as usize;
+
+        if typecode != '[' && typecode != 'L' { return Ok(FieldDesc::PrimitiveDesc(typecode, name))}
+
+        len = i16_fs(self.buf, bytes);
+        self.buf += 2;
+        let ftype: String = str_fs(self.buf, bytes, len as i32);
+        self.buf += len as usize;
+
+        Ok(FieldDesc::ObjectDesc(typecode, name, ftype))
+    }
+
+    pub fn read_class_annotation (&mut self, bytes: &[u8]) -> Result<ClassAnnotation,DeserializeError> {
+        let mut contents: Vec<Content> = Vec::new();
+        while bytes[self.buf] != TC_ENDBLOCKDATA {
+            contents.push(self.read_content(bytes)?);
+        }
+        if contents.len() > 0 {return Ok(ClassAnnotation::Contents(contents))}
+        Ok(ClassAnnotation::EndBlockData)
     }
 
     pub fn get_string (&mut self, bytes: &[u8]) -> Result<String,DeserializeError> {
