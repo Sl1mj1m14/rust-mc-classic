@@ -3,9 +3,8 @@ mod from_stream;
 
 use flate2::read::GzDecoder;
 use from_stream::{i16_fs, i64_fs, str_fs, u16_fs, u32_fs};
-use serialize::Deserializer;
+use serialize::{Deserializer,DeserializeError};
 
-use std::fmt::Error; //Temporary error until serializer implements it's own
 use std::fs::read;
 use std::io::Read;
 
@@ -17,21 +16,17 @@ use mc_classic_js as js;
 fn main() {
     println!("Hello, world!");
 
-    let input: String = String::from("test/level2.dat");
+    let input: String = String::from("test/testlevel.dat");
     let output: String = String::from("test/data.sqlite");
     let level: Level = read_level(input);
     println!("File is read");
-
-    return;
 
     println!("Iterating through {} iterations", level.blocks.clone().unwrap().len());
     let tile_map: Vec<u8> = classic_id_to_js_id(level.blocks.clone().unwrap());
     println!("Tiles are converted");
     println!("Level Author: {}", level.creator.clone().unwrap());
 
-    return;
-
-    let json_string: String = js::serialize_saved_game_from_seed(47, tile_map);
+    let json_string: String = js::serialize_saved_game_from_seed(1, tile_map);
     println!("Json is prepped");
     js::write_saved_game(output, json_string).expect("Uh oh!");
     println!("File has been written");
@@ -47,13 +42,13 @@ pub struct Level {
     name: Option<String>, //0.0.13a-dev
     creator: Option<String>, //0.0.13a-dev
     createTime: Option<i64>, //0.0.13a-dev
-    width: Option<i16>, //0.0.13a-dev
-    height: Option<i16>, //0.0.13a-dev
-    depth: Option<i16>, //0.0.13a-dev
+    width: Option<i32>, //0.0.13a-dev
+    height: Option<i32>, //0.0.13a-dev
+    depth: Option<i32>, //0.0.13a-dev
     xSpawn: Option<i32>, //0.0.14a_08
     ySpawn: Option<i32>, //0.0.14a_08
     zSpawn: Option<i32>, //0.0.14a_08
-    rotSpawn: Option<f64>, //0.0.14a_08
+    rotSpawn: Option<u32>, //0.0.14a_08
     tickCount: Option<i32>, //0.0.14a_08
     unprocessed: Option<i32>, //0.0.14a_08
     entities: Option<Vec<Entity>>, //0.0.14a_08 - Removed 0.25_05_st
@@ -145,10 +140,12 @@ pub fn classic_13_to_level (bytes: Vec<u8>) -> Level {
     buf += 2;
 
     //Setting width, depth, and height - Short Format
-    level.width = Some(i16_fs(buf, &bytes[..]));
-    level.height = Some(i16_fs(buf, &bytes[..]));
-    level.depth = Some(i16_fs(buf, &bytes[..]));
-    buf += 4 * 3;
+    level.width = Some(i16_fs(buf, &bytes[..]) as i32);
+    buf += 2;
+    level.height = Some(i16_fs(buf, &bytes[..]) as i32);
+    buf += 2;
+    level.depth = Some(i16_fs(buf, &bytes[..]) as i32);
+    buf += 2;
 
     println!("x: {} y: {} z: {}", level.width.unwrap(),level.height.unwrap(),level.depth.unwrap());
 
@@ -164,7 +161,7 @@ pub fn classic_13_to_level (bytes: Vec<u8>) -> Level {
 
 }
 
-pub fn classic_to_level (bytes: Vec<u8>) -> Result<Level, Error> {
+pub fn classic_to_level (bytes: Vec<u8>) -> Result<Level, DeserializeError> {
 
     let mut buf: usize = 4;
     let mut level: Level = Level::new();
@@ -172,10 +169,70 @@ pub fn classic_to_level (bytes: Vec<u8>) -> Result<Level, Error> {
     level.version = Some(bytes[buf as usize]);
     buf += 1;
 
-    let mut deserializer: Deserializer = Deserializer::new();
-    let contents = deserializer.deserialize(&bytes[buf..]);
+   println!("{}",&bytes[buf..].len());
 
-    println!("{:?}",contents);
+    let mut deserializer: Deserializer = Deserializer::new();
+    let contents: Vec<serialize::Content> = deserializer.deserialize(&bytes[buf..])?;
+    println!("Contents: {}", contents.len());
+
+    if contents.len() != 1 { return Err(DeserializeError::InvalidContentLength(1, contents.len())) }
+
+    let object: serialize::NewObject = contents[0].get_object()?.get_new_object()?;
+
+    let class_info: serialize::NewClassDesc = object.class_desc.get_new_class_desc()?;
+    let class_data: serialize::ClassData = object.class_data.unwrap();
+
+    if class_info.get_class_name()? != "com.mojang.minecraft.level.Level" {
+        return Err(DeserializeError::InvalidClass(class_info.get_class_name()?.clone()))
+    }
+
+    let fields: serialize::Fields = class_info.get_class_desc_info()?.unwrap().fields;
+    let values: Vec<serialize::Value> = class_data.get_values()?;
+
+    for i in 0..fields.count as usize {
+        match fields.field_descs[i].get_field_name()?.as_str() {
+            "createTime" => { level.createTime = Some(values[i].get_long()?) },
+            "depth" => { level.depth = Some(values[i].get_integer()?) },
+            "height" => { level.height = Some(values[i].get_integer()?) },
+            "rotSpawn" => { level.rotSpawn = Some(values[i].get_float()?) },
+            "tickCount" => { level.tickCount = Some(values[i].get_integer()?) },
+            "unprocessed" => { level.unprocessed = Some(values[i].get_integer()?) },
+            "width" => { level.width = Some(values[i].get_integer()?) },
+            "xSpawn" => { level.xSpawn = Some(values[i].get_integer()?) },
+            "ySpawn" => { level.zSpawn = Some(values[i].get_integer()?) },
+            "zSpawn" => { level.ySpawn = Some(values[i].get_integer()?) },
+            "networkMode" => { level.networkMode = Some(values[i].get_boolean()?) },
+            "blocks" => { 
+                let wrapped: Vec<serialize::Value> = values[i].get_array()?; 
+                let mut blocks: Vec<u8> = Vec::new();
+                for value in wrapped {
+                    blocks.push(value.get_byte()?)
+                }
+                level.blocks = Some(blocks);
+            },
+            "creator" => { 
+                level.creator = values[i].get_object()?.get_new_string()?.string; 
+            },
+            "entities" => { () }, //ADD SUPPORT FOR ARRAY LIST TYPES IN THE FUTURE!!
+            "name" => { 
+                level.creator = values[i].get_object()?.get_new_string()?.string; 
+            },
+            _ => println!("Unexpected Field: {}", fields.field_descs[i].get_field_name()?.as_str())
+
+        }
+    }
+
+    //println!("Class Name: {:?}", contents[0].get_object()?.get_new_object()?.class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap());
+    //println!("Values: {:?}", &contents[0].get_object()?.get_new_object()?.class_data.unwrap().get_values()?[0..9]);
+    //println!("Values: {:?}", &contents[0].get_object()?.get_new_object()?.class_data.unwrap().get_values()?[11..14]);
+    //println!("{:?}", contents[1]);
+    //println!("{:?}", contents[0].get_object()?.get_new_object()?.class_desc.get_new_class_desc()?.get_class_name()?);
+
+    //println!("{:#?}",contents);
+    //class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap();
+    println!("HOLY CRAP SWEET LORD ABOVE IT ACTUALLY WORKED YOU INSANE IDIOT!!!!!!!");
+
+
 
     return Ok(level);
 
