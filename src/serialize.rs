@@ -719,7 +719,8 @@ impl Deserializer {
         println!("Here is the class_desc: {:?}", class_desc.clone());
 
         let index: usize = self.handles.len();
-        self.handles.push(Object::NewObject(new_object.clone()));
+        if !flag { self.handles.push(Object::NewObject(new_object.clone())); }
+
 
         //let class_desc_info: ClassDescInfo = class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap();
 
@@ -727,7 +728,7 @@ impl Deserializer {
         new_object.class_data = Some(self.read_class_data(bytes,class_desc)?);
         println!("class data is done");
 
-        self.handles[index] = Object::NewObject(new_object.clone());
+        if !flag { self.handles[index] = Object::NewObject(new_object.clone()); }
 
         Ok(new_object)
     }
@@ -1130,7 +1131,7 @@ impl Deserializer {
             _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf],self.buf))
         };
 
-        println!("Value is: {:?}", value);
+        //println!("Value is: {:?}", value);
         Ok(value)
     }
 
@@ -1155,21 +1156,6 @@ impl Deserializer {
 
         println!("HEY YOU GUYS!!! - HERE IS THE CLASS NAME: {}", class_name);
         println!("{:?}",&bytes[self.buf..self.buf+25]);
-
-        /*match class_name {
-            // OVERRIDE FOR ARRAYLIST
-            CC_ARRAYLIST => {
-                count = 2;
-                field_descs = Vec::new();
-                field_descs.push(
-                    FieldDesc::PrimitiveDesc('I', String::from("Size"))
-                );
-                field_descs.push(
-                    FieldDesc::PrimitiveDesc('O', String::from("Blockdata"))
-                )
-            },
-            _ => ()
-        }*/
 
         Ok(Fields { count: count, field_descs: field_descs })
     }
@@ -1197,11 +1183,6 @@ impl Deserializer {
 
         let ftype: String = self.read_new_string(bytes)?.string.unwrap();
 
-        /*len = i16_fs(self.buf, bytes);
-        self.buf += 2;
-        let ftype: String = str_fs(self.buf, bytes, len as i32);
-        self.buf += len as usize;*/
-
         println!("{}",ftype);
 
         Ok(FieldDesc::ObjectDesc(typecode, name, ftype))
@@ -1215,31 +1196,6 @@ impl Deserializer {
         if contents.len() > 0 {return Ok(ClassAnnotation::Contents(contents))}
         self.buf += 1;
         Ok(ClassAnnotation::EndBlockData)
-    }
-
-    pub fn get_string (&mut self, bytes: &[u8]) -> Result<String,DeserializeError> {
-        match bytes[self.buf] {
-            TC_STRING => {
-                self.buf += 1;
-                let sh: i16 = i16_fs(self.buf, bytes);
-                self.buf += 2;
-                let string: String = str_fs(self.buf, bytes, sh as i32);
-                self.buf += sh as usize;
-                Ok(string)
-            },
-            TC_LONGSTRING => {
-                self.buf += 1;
-                let int: i32 = i32_fs(self.buf, bytes);
-                self.buf += 4;
-                let string: String = str_fs(self.buf, bytes, int);
-                self.buf += int as usize;
-                Ok(string)
-            },
-            TC_REFERENCE => {
-                Ok(self.read_reference(bytes)?.get_new_string()?.string.unwrap())
-            }
-            _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf],self.buf))
-        }
     }
 
     pub fn get_arr (&mut self, bytes: &[u8], len: usize) -> Result<Vec<u8>,DeserializeError> {
