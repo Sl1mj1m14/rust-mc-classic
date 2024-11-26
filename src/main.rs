@@ -2,7 +2,7 @@ mod serialize;
 mod from_stream;
 
 use flate2::read::GzDecoder;
-use from_stream::{i16_fs, i64_fs, str_fs, u16_fs, u32_fs};
+use from_stream::{i16_fs, f32_fs, i64_fs, str_fs, u16_fs, u32_fs, u64_fs};
 use serialize::{Deserializer,DeserializeError};
 
 use std::fs::read;
@@ -16,10 +16,15 @@ use mc_classic_js as js;
 fn main() {
     println!("Hello, world!");
 
-    let input: String = String::from("test/testlevel.dat");
+    let temp_float = f32_fs(0, &[63, 0, 0, 0]);
+    println!("I really hope this is a value that makes sense: {}", temp_float);
+
+    let input: String = String::from("test/level4.dat");
     let output: String = String::from("test/data.sqlite");
     let level: Level = read_level(input);
     println!("File is read");
+
+    return;
 
     println!("Iterating through {} iterations", level.blocks.clone().unwrap().len());
     let tile_map: Vec<u8> = classic_id_to_js_id(level.blocks.clone().unwrap());
@@ -48,7 +53,7 @@ pub struct Level {
     xSpawn: Option<i32>, //0.0.14a_08
     ySpawn: Option<i32>, //0.0.14a_08
     zSpawn: Option<i32>, //0.0.14a_08
-    rotSpawn: Option<u32>, //0.0.14a_08
+    rotSpawn: Option<f32>, //0.0.14a_08
     tickCount: Option<i32>, //0.0.14a_08
     unprocessed: Option<i32>, //0.0.14a_08
     entities: Option<Vec<Entity>>, //0.0.14a_08 - Removed 0.25_05_st

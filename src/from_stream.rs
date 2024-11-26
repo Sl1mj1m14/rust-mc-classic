@@ -38,6 +38,16 @@ pub fn i32_fs (mut buf: usize, bytes: &[u8]) -> i32 {
     return i32::from_be_bytes(bits);
 }
 
+pub fn f32_fs (mut buf: usize, bytes: &[u8]) -> f32 {
+    const LEN: usize = 4;
+    let mut bits: [u8; LEN] = [0; LEN];
+    for i in 0..bits.len() {
+        bits[i] = bytes[buf];
+        buf += 1;
+    }   
+    return f32::from_be_bytes(bits);
+}
+
 pub fn u64_fs (mut buf: usize, bytes: &[u8]) -> u64 {
     const LEN: usize = 8;
     let mut bits: [u8; LEN] = [0; LEN];
@@ -56,6 +66,16 @@ pub fn i64_fs (mut buf: usize, bytes: &[u8]) -> i64 {
         buf += 1;
     }   
     return i64::from_be_bytes(bits);
+}
+
+pub fn f64_fs (mut buf: usize, bytes: &[u8]) -> f64 {
+    const LEN: usize = 8;
+    let mut bits: [u8; LEN] = [0; LEN];
+    for i in 0..bits.len() {
+        bits[i] = bytes[buf];
+        buf += 1;
+    }   
+    return f64::from_be_bytes(bits);
 }
 
 pub fn str_fs (mut buf: usize, bytes: &[u8], len: i32) -> String {

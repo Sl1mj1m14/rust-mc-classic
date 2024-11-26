@@ -7,7 +7,7 @@
  * Handle Resets
  */
 
-use crate::from_stream::{u16_fs,u32_fs,u64_fs,i16_fs,i32_fs,i64_fs,str_fs};
+use crate::from_stream::{u16_fs,i16_fs,i32_fs,i64_fs,f32_fs,f64_fs,str_fs};
 use thiserror::Error;
 
 pub const STREAM_MAGIC: u16 = 0xAC_ED;
@@ -110,6 +110,7 @@ impl Object {
     }
 
     pub fn get_new_class_desc (&self) -> Result<NewClassDesc,DeserializeError> {
+        println!("Okay, I'm getting a new class...");
         match self {
             Object::NewClassDesc(value) => Ok(value.clone()),
             _ => Err(DeserializeError::InvalidEnumValue())
@@ -218,6 +219,7 @@ pub enum NewClassDesc {
 
 impl NewClassDesc {
     pub fn get_class_name (&self) -> Result<String,DeserializeError> {
+        //println!("Okay this is so weird I don't understand what is wrong here...");
         match self {
             NewClassDesc::ClassDesc(
                 string, _, _ 
@@ -274,6 +276,7 @@ pub enum ClassDesc {
 
 impl ClassDesc {
     pub fn get_new_class_desc (&self) -> Result<NewClassDesc,DeserializeError> {
+        //println!("Hi, I am a class description");
         match self {
             ClassDesc::NewClassDesc(value) => Ok(value.clone()),
             _ => Err(DeserializeError::InvalidEnumValue())
@@ -330,7 +333,7 @@ pub struct ClassDescInfo {
     pub class_desc_flags: u8,
     pub fields: Fields,
     pub class_annotation: ClassAnnotation,
-    pub super_class_desc: Box<ClassDesc>
+    pub super_class_desc: Box<NewObject>
 }
 
 #[derive(Clone,Debug)]
@@ -459,8 +462,8 @@ impl FieldDesc {
 pub enum Value {
     Byte(u8),
     Char(char),
-    Double(u64),
-    Float(u32),
+    Double(f64),
+    Float(f32),
     Integer(i32),
     Short(i16),
     Long(i64),
@@ -485,14 +488,14 @@ impl Value {
         }
     }
 
-    pub fn get_double (&self) -> Result<u64,DeserializeError> {
+    pub fn get_double (&self) -> Result<f64,DeserializeError> {
         match self {
             Value::Double(value) => Ok(value.clone()),
             _ => Err(DeserializeError::InvalidEnumValue())
         }
     }
 
-    pub fn get_float (&self) -> Result<u32,DeserializeError> {
+    pub fn get_float (&self) -> Result<f32,DeserializeError> {
         match self {
             Value::Float(value) => Ok(value.clone()),
             _ => Err(DeserializeError::InvalidEnumValue())
@@ -653,7 +656,7 @@ impl Deserializer {
     pub fn read_object (&mut self, bytes: &[u8]) -> Result<Object,DeserializeError> {
         println!("Uh oh - this is an object, here is the byte we entered this bad boy: {} and it's {}",self.buf,bytes[self.buf]);
         let object: Object = match bytes[self.buf] {
-            TC_OBJECT => Object::NewObject(self.read_new_object(bytes)?),
+            TC_OBJECT => Object::NewObject(self.read_new_object(bytes,false)?),
             TC_CLASS => Object::NewClass(self.read_new_class(bytes)?),
             TC_ARRAY => Object::NewArray(self.read_new_array(bytes)?),
             TC_STRING => Object::NewString(self.read_new_string(bytes)?),
@@ -700,20 +703,28 @@ impl Deserializer {
 
     }
 
-    pub fn read_new_object (&mut self, bytes: &[u8]) -> Result<NewObject,DeserializeError> {
+    pub fn read_new_object (&mut self, bytes: &[u8], flag: bool) -> Result<NewObject,DeserializeError> {
         println!("Uh oh - this is an object, here is the byte we entered this bad boy: {} and it's {}",self.buf,bytes[self.buf]);
-        if bytes[self.buf] != TC_OBJECT { return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf],self.buf)) }
-        self.buf += 1;
+
+        if bytes[self.buf] == TC_OBJECT {
+            self.buf += 1; 
+        } else if !flag {
+            return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf],self.buf))
+        }
 
         let class_desc: ClassDesc = self.read_class_desc(bytes)?;
         let mut new_object: NewObject = NewObject {class_desc: class_desc.clone(), class_data: None};
 
+        println!("Hello!");
+        println!("Here is the class_desc: {:?}", class_desc.clone());
+
         let index: usize = self.handles.len();
         self.handles.push(Object::NewObject(new_object.clone()));
 
-        let class_desc_info: ClassDescInfo = class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap();
+        //let class_desc_info: ClassDescInfo = class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap();
 
-        new_object.class_data = Some(self.read_class_data(bytes,class_desc_info)?);
+        //Change this so the whole class_desc is being passed to class_data - this will allow for arrayList handling
+        new_object.class_data = Some(self.read_class_data(bytes,class_desc)?);
         println!("class data is done");
 
         self.handles[index] = Object::NewObject(new_object.clone());
@@ -751,7 +762,7 @@ impl Deserializer {
         self.buf += 4;
         println!("The size for this array is: {}", new_array.size.clone().unwrap());
 
-        println!("{:?}",class_desc.get_new_class_desc()?);
+        //println!("{:?}",class_desc.get_new_class_desc()?);
 
         //FIX TYPECODE FOR ARRAYS
 
@@ -769,7 +780,7 @@ impl Deserializer {
 
         println!("The type for this array is: {}", code);
         for _ in 0..new_array.size.unwrap() { 
-            let value: Value = self.read_value(bytes, code, ftype.clone())?;
+            let value: Value = self.read_value(bytes, code)?;
             values.push(value);
         }
         new_array.values = Some(values);
@@ -848,10 +859,14 @@ impl Deserializer {
                 let len: i16 = i16_fs(self.buf, bytes);
                 self.buf += 2;
                 let class_name: String = str_fs(self.buf, bytes, len as i32);
+                println!("Hey, so um, if you don't mind pre fields my class name is: {}", class_name);
                 self.buf += len as usize;
+
+                println!("{:?}",&bytes[self.buf..self.buf+25]);
 
                 let serial_version_uuid: i64 = i64_fs(self.buf, bytes);
                 self.buf += 8;
+                println!("Hey - here is the uuid: {}", serial_version_uuid);
 
                 let mut new_class_desc: NewClassDesc = NewClassDesc::ClassDesc(class_name.clone(), serial_version_uuid, None);
 
@@ -895,6 +910,7 @@ impl Deserializer {
 
         let index: usize = (handle - BASE_WIRE_HANDLE) as usize;
         if index >= self.handles.len() { return Err(DeserializeError::IndexOutOfBounds(index, self.handles.len()))}
+        println!("{:?}",self.handles[index-1].clone());
         Ok(self.handles[index].clone())
     }
 
@@ -909,45 +925,84 @@ impl Deserializer {
 
     }
 
-    pub fn read_class_data (&mut self, bytes: &[u8], class_desc_info: ClassDescInfo) -> Result<ClassData,DeserializeError> {
-        println!("Uh oh - this is class data, here is the byte we entered this bad boy: {} and it's {}",self.buf,bytes[self.buf+2]);
-        println!("{:?}",&bytes[self.buf..self.buf+25]);
-        println!("{:?}",class_desc_info.fields.field_descs);
+    pub fn read_class_data (&mut self, bytes: &[u8], class_desc: ClassDesc) -> Result<ClassData,DeserializeError> {
+        println!("Uh oh - this is class data, here is the byte we entered this bad boy: {} and it's {}",self.buf,bytes[self.buf]);
+        println!("{:?}",&bytes[self.buf..self.buf+100]);
+        println!("{:?}",class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap().fields.field_descs);
+        println!("{:?}",class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap().super_class_desc);
         let flag: u8 = self.super_flag;
         println!("{}", flag);
         match flag {
             SC_WRITE_METHOD => {
                 let mut values: Vec<Value> = Vec::new();
-                let len: i16 = class_desc_info.fields.count;
-                let fields: Vec<FieldDesc> = class_desc_info.fields.field_descs;
-                for i in 0..len as usize {
-                    if i >= fields.len() { return Err(DeserializeError::IndexOutOfBounds(i, fields.len()))}
-                    let code: char = fields[i].get_typecode()?;
+                let class_name: String = class_desc.get_new_class_desc()?.get_class_name()?;
+                match class_name.as_str() {
+                    CC_ARRAYLIST => {
+                        let size = i32_fs(self.buf, bytes);
+                        self.buf += 4;
+                        values.push(Value::Integer(size));
+                        if bytes[self.buf] != TC_BLOCKDATA {return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf], self.buf))}
+                        self.buf += 1;
+                        self.buf += 5; //It moves 4 as there is an int value that is equal exactly to size
+                        let mut arr: Vec<Value> = Vec::new();
+                        for _ in 0..size as usize {
+                            arr.push(Value::Object(self.read_object(bytes)?));
+                        }
+                        if bytes[self.buf] != TC_ENDBLOCKDATA {return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf], self.buf))}
+                        self.buf += 1;
 
-                    let mut ftype: String = String::from("");
-                    if code == '[' || code == 'L' {ftype = fields[i].get_field_type()?;}
-
-                    values.push(self.read_value(bytes,code,ftype)?);
+                    },
+                    _ => {
+                        let len: i16 = class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap().fields.count;
+                        let fields: Vec<FieldDesc> = class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap().fields.field_descs;
+                        for i in 0..len as usize {
+                            if i >= fields.len() { return Err(DeserializeError::IndexOutOfBounds(i, fields.len()))}
+                            let code: char = fields[i].get_typecode()?;
+                            values.push(self.read_value(bytes,code)?);
+                        }
+                    }
                 }
+                
                 let object_annotation: ObjectAnnotation = self.read_object_annotation(bytes)?;
                 Ok(ClassData::WrClass(values, object_annotation))
             },
             SC_BLOCK_DATA => Ok(ClassData::ObjectAnnotation(self.read_object_annotation(bytes)?)),
             SC_SERIALIZABLE => {
+                //println!("I'm serialized!");
                 let mut values: Vec<Value> = Vec::new();
-                let len: i16 = class_desc_info.fields.count;
-                let fields: Vec<FieldDesc> = class_desc_info.fields.field_descs;
-                for i in 0..len as usize {
-                    println!("This should only be said once... not {i} times");
-                    //println!("{:?}",&bytes[self.buf..self.buf+25]);
-                    if i >= fields.len() { return Err(DeserializeError::IndexOutOfBounds(i, fields.len()))}
-                    let code: char = fields[i].get_typecode()?;
-                    println!("code is: {:?}", code);
+                let class_name: String = class_desc.get_new_class_desc()?.get_class_name()?;
+                println! ("Class Name Is This:{}", class_name);
+                match class_name.as_str() {
+                    CC_ARRAYLIST => {
+                        let size = i32_fs(self.buf, bytes);
+                        println!("Size is this: {}", size);
+                        self.buf += 4;
+                        values.push(Value::Integer(size));
+                        if bytes[self.buf] != TC_BLOCKDATA {return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf], self.buf))}
+                        self.buf += 1;
+                        self.buf += 5; //It moves 4 as there is an int value that is equal exactly to size
+                        let mut arr: Vec<Value> = Vec::new();
+                        for _ in 0..size as usize {
+                            arr.push(Value::Object(self.read_object(bytes)?));
+                        }
+                        if bytes[self.buf] != TC_ENDBLOCKDATA {return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf], self.buf))}
+                        self.buf += 1;
 
-                    let mut ftype: String = String::from("");
-                    if code == '[' || code == 'L' {ftype = fields[i].get_field_type()?;}
-
-                    values.push(self.read_value(bytes,code,ftype)?);
+                    },
+                    _ => {
+                        println!("{:?}",&bytes[self.buf..self.buf+100]);
+                        
+                        let len: i16 = class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap().fields.count;
+                        let fields: Vec<FieldDesc> = class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap().fields.field_descs;
+                        for i in 0..len as usize {
+                            if bytes[self.buf] == TC_ENDBLOCKDATA { self.buf += 1; }
+                            if i >= fields.len() { return Err(DeserializeError::IndexOutOfBounds(i, fields.len()))}
+                            let code: char = fields[i].get_typecode()?;
+                            println!("Here is the expected field: {}", fields[i].get_field_name()?);
+                            values.push(self.read_value(bytes,code)?);
+                            
+                        }
+                    }
                 }
                 Ok(ClassData::NoWrClass(values))
             },
@@ -967,7 +1022,13 @@ impl Deserializer {
         self.buf += 1;
         let fields: Fields = self.read_fields(bytes, class_name)?;
         let class_annotation: ClassAnnotation = self.read_class_annotation(bytes)?;
-        let super_class_description: ClassDesc = self.read_class_desc(bytes)?;
+        let super_class_description: NewObject = match bytes[self.buf] {
+            TC_NULL => {
+                self.buf += 1;
+                NewObject {class_desc: ClassDesc::Null, class_data: None}
+            },
+            _ => self.read_new_object(bytes,true)?
+        };
 
         Ok(ClassDescInfo { 
             class_desc_flags: flag,
@@ -1003,7 +1064,7 @@ impl Deserializer {
         })
     }
 
-    pub fn read_value (&mut self, bytes: &[u8], typecode: char, ftype: String) -> Result<Value,DeserializeError> {
+    pub fn read_value (&mut self, bytes: &[u8], typecode: char, /*ftype: String*/) -> Result<Value,DeserializeError> {
         let value: Value = match typecode {
             'B' => {
                 let b: u8 = bytes[self.buf];
@@ -1016,12 +1077,12 @@ impl Deserializer {
                 Value::Char(c)
             },
             'D' => {
-                let d: u64 = u64_fs(self.buf, bytes);
+                let d: f64 = f64_fs(self.buf, bytes);
                 self.buf += 8;
                 Value::Double(d)
             },
             'F' => {
-                let f: u32 = u32_fs(self.buf, bytes);
+                let f: f32 = f32_fs(self.buf, bytes);
                 self.buf += 4;
                 Value::Float(f)
             },
@@ -1052,6 +1113,7 @@ impl Deserializer {
                 match bytes[self.buf] {
                     TC_BLOCKDATA => Value::BlockData(self.read_blockdata(bytes)?),
                     TC_ARRAY => Value::Array(self.read_new_array(bytes)?.values.unwrap()),
+                    TC_OBJECT => Value::Object(self.read_object(bytes)?),
                     _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf],self.buf))
                 }
                 
@@ -1068,7 +1130,7 @@ impl Deserializer {
             _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf],self.buf))
         };
 
-        //println!("{:?}", value);
+        println!("Value is: {:?}", value);
         Ok(value)
     }
 
@@ -1092,8 +1154,9 @@ impl Deserializer {
         }
 
         println!("HEY YOU GUYS!!! - HERE IS THE CLASS NAME: {}", class_name);
+        println!("{:?}",&bytes[self.buf..self.buf+25]);
 
-        match class_name {
+        /*match class_name {
             // OVERRIDE FOR ARRAYLIST
             CC_ARRAYLIST => {
                 count = 2;
@@ -1106,7 +1169,7 @@ impl Deserializer {
                 )
             },
             _ => ()
-        }
+        }*/
 
         Ok(Fields { count: count, field_descs: field_descs })
     }
