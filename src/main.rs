@@ -20,7 +20,7 @@ fn main() {
     println!("I really hope this is a value that makes sense: {}", temp_float);
 
     //return;
-    let input: String = String::from("test/Classic Levels/level_30_s.mine");
+    let input: String = String::from("test/Classic Levels/level_30_c.mine");
     let output: String = String::from("test/data.sqlite");
     let level: Level = read_level(input);
     println!("File is read");

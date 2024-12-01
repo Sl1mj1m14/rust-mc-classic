@@ -920,7 +920,7 @@ impl Deserializer {
         //if self.buf == 3004 + 1 + 4 {
             //println!("Here is #27: {:?}",self.handles[27].clone());
             println!("Here is REFERENCE: {:?}",self.handles[index].clone());
-            println!("{:?}",&bytes[self.buf..self.buf+100]);
+            //println!("{:?}",&bytes[self.buf..self.buf+100]);
         //}
         Ok(self.handles[index].clone())
     }
@@ -1226,7 +1226,7 @@ impl Deserializer {
             _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf],self.buf))
         };
 
-        println!("Value is: {:?}", value);
+        //println!("Value is: {:?}", value);
         Ok(value)
     }
 
