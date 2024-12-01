@@ -716,7 +716,7 @@ impl Deserializer {
         let mut new_object: NewObject = NewObject {class_desc: class_desc.clone(), class_data: None};
 
         println!("Hello!");
-        println!("Here is the class_desc: {:?}", class_desc.clone());
+        //println!("Here is the class_desc: {:?}", class_desc.clone());
 
         let index: usize = self.handles.len();
         if !flag { self.handles.push(Object::NewObject(new_object.clone())); }
@@ -908,10 +908,20 @@ impl Deserializer {
         self.buf += 1;
         let handle: i32 = i32_fs(self.buf, bytes);
         self.buf += 4;
+        println!("HANDLE NUMBER IS THIS - WHYYYYY: {}",handle - BASE_WIRE_HANDLE);
 
-        let index: usize = (handle - BASE_WIRE_HANDLE) as usize;
+        let mut index: usize = (handle - BASE_WIRE_HANDLE) as usize;
+        //--DEBUG--
+        //if index == 20 { index = 25 } //DEBUG
+        //if index == 21 { index = 20 } //DEBUG
+        //if index == 23 { index = 24; } //DEBUG
+        
         if index >= self.handles.len() { return Err(DeserializeError::IndexOutOfBounds(index, self.handles.len()))}
-        println!("{:?}",self.handles[index-1].clone());
+        //if self.buf == 3004 + 1 + 4 {
+            //println!("Here is #27: {:?}",self.handles[27].clone());
+            println!("Here is REFERENCE: {:?}",self.handles[index].clone());
+            println!("{:?}",&bytes[self.buf..self.buf+100]);
+        //}
         Ok(self.handles[index].clone())
     }
 
@@ -919,8 +929,19 @@ impl Deserializer {
         println!("Uh oh - this is an inner class desc, here is the byte we entered this bad boy: {} and it's {}",self.buf,bytes[self.buf]);
         match bytes[self.buf] {
             TC_CLASSDESC => Ok(ClassDesc::NewClassDesc(self.read_new_class_desc(bytes)?)),
-            TC_NULL => { self.buf += 1; Ok(ClassDesc::Null) },
-            TC_REFERENCE => Ok(ClassDesc::NewClassDesc(self.read_reference(bytes)?.get_new_class_desc()?)),
+            TC_NULL => { 
+                self.buf += 1; 
+                Ok(ClassDesc::Null) 
+            },
+            TC_REFERENCE => {
+                let ref0: Object = self.read_reference(bytes)?;
+                if matches!(ref0.clone(), Object::NewClassDesc(NewClassDesc)) {
+                    return Ok(ClassDesc::NewClassDesc(ref0.get_new_class_desc()?))
+                } else {
+                    return Ok(ClassDesc::NewClassDesc(ref0.get_new_object()?.class_desc.get_new_class_desc()?))
+                }
+                //Ok(ClassDesc::NewClassDesc(self.read_reference(bytes)?.get_new_class_desc()?))
+            },
             _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf], self.buf))
         }
 
@@ -929,44 +950,12 @@ impl Deserializer {
     pub fn read_class_data (&mut self, bytes: &[u8], class_desc: ClassDesc) -> Result<ClassData,DeserializeError> {
         println!("Uh oh - this is class data, here is the byte we entered this bad boy: {} and it's {}",self.buf,bytes[self.buf]);
         println!("{:?}",&bytes[self.buf..self.buf+100]);
-        println!("{:?}",class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap().fields.field_descs);
-        println!("{:?}",class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap().super_class_desc);
+        println!("Here are the fields we are getting: {:?}",class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap().fields.field_descs);
+        //println!("{:?}",class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap().super_class_desc);
         let flag: u8 = self.super_flag;
         println!("{}", flag);
         match flag {
-            SC_WRITE_METHOD => {
-                let mut values: Vec<Value> = Vec::new();
-                let class_name: String = class_desc.get_new_class_desc()?.get_class_name()?;
-                match class_name.as_str() {
-                    CC_ARRAYLIST => {
-                        let size = i32_fs(self.buf, bytes);
-                        self.buf += 4;
-                        values.push(Value::Integer(size));
-                        if bytes[self.buf] != TC_BLOCKDATA {return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf], self.buf))}
-                        self.buf += 1;
-                        self.buf += 5; //It moves 4 as there is an int value that is equal exactly to size
-                        let mut arr: Vec<Value> = Vec::new();
-                        for _ in 0..size as usize {
-                            arr.push(Value::Object(self.read_object(bytes)?));
-                        }
-                        if bytes[self.buf] != TC_ENDBLOCKDATA {return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf], self.buf))}
-                        self.buf += 1;
-
-                    },
-                    _ => {
-                        let len: i16 = class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap().fields.count;
-                        let fields: Vec<FieldDesc> = class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap().fields.field_descs;
-                        for i in 0..len as usize {
-                            if i >= fields.len() { return Err(DeserializeError::IndexOutOfBounds(i, fields.len()))}
-                            let code: char = fields[i].get_typecode()?;
-                            values.push(self.read_value(bytes,code)?);
-                        }
-                    }
-                }
-                
-                let object_annotation: ObjectAnnotation = self.read_object_annotation(bytes)?;
-                Ok(ClassData::WrClass(values, object_annotation))
-            },
+            SC_WRITE_METHOD =>  return Err(DeserializeError::Unimplemented(String::from("Externalized Data"))),
             SC_BLOCK_DATA => Ok(ClassData::ObjectAnnotation(self.read_object_annotation(bytes)?)),
             SC_SERIALIZABLE => {
                 //println!("I'm serialized!");
@@ -983,11 +972,71 @@ impl Deserializer {
                         self.buf += 1;
                         self.buf += 5; //It moves 4 as there is an int value that is equal exactly to size
                         let mut arr: Vec<Value> = Vec::new();
-                        for _ in 0..size as usize {
-                            arr.push(Value::Object(self.read_object(bytes)?));
+                        //Check for objects being repeated inside an arrayList
+                        //Objects set all fields - including for super classes when called from references
+                        //Check if object has a reference as class
+                        //If it does, create object here
+                        //Get class description, and then remove all class data up through superclass
+                        //Reset class data - starting with superclass
+                        for i in 0..size as usize {
+                            let temp_float = f32_fs(0, &[63, 0, 0, 0]);
+                            println!("I really hope this is a value that makes sense: {}", temp_float);
+                            println!("RETREIVING OBJECT [{i}] - RIGHT NOW - RED ALERT");
+                            println!("{:?}",&bytes[self.buf..self.buf+100]);
+
+                            if self.buf < bytes.len()-1 && bytes[self.buf] == TC_OBJECT && bytes[self.buf + 1] == TC_REFERENCE {
+                                self.buf += 1;
+                                //Read the reference in as a class description
+                                let new_class_desc: NewClassDesc = self.read_reference(bytes)?.get_new_class_desc()?;
+                                let mut super_class: ClassDesc = new_class_desc.get_class_desc_info()?.unwrap().super_class_desc.class_desc;
+
+                                let mut class_descs: Vec<ClassDesc> = Vec::new();
+                                class_descs.push(ClassDesc::NewClassDesc(new_class_desc.clone()));
+                                
+                                while !matches!(super_class, ClassDesc::Null) {
+                                    class_descs.push(super_class.clone());
+                                    super_class = super_class.clone().get_new_class_desc()?.get_class_desc_info()?.unwrap().super_class_desc.class_desc;
+                                }
+
+                                let mut class_datas: Vec<ClassData> = Vec::new();
+
+                                for i in 0..class_descs.len() {
+                                    class_datas.push(self.read_class_data(bytes, class_descs[class_descs.len()-i-1].clone())?);
+                                } 
+
+                                //Rebuild new class
+                                //Start with super class first
+                                //Get last ClassDesc
+                                //Get last ClassDescInfo
+                                //Set SuperClass to Null/None  
+                                //Get last Class
+                                // 
+
+                                //New Object
+
+                                let mut object: NewObject = NewObject {class_desc: ClassDesc::Null, class_data: None};
+
+                                for i in 0..class_datas.len() {
+                                    let mut class_desc: NewClassDesc  = class_descs[class_descs.len()-i-1].clone().get_new_class_desc()?;
+                                    let name: String = class_desc.get_class_name()?;
+                                    let uuid: i64 = class_desc.get_serial_version_uuid()?;
+                                    let mut info: ClassDescInfo = class_desc.get_class_desc_info()?.unwrap();
+                                    info.super_class_desc = Box::new(object.clone());
+                                    class_desc = NewClassDesc::ClassDesc(name, uuid, Some(info));
+                                    object = NewObject {class_desc: ClassDesc::NewClassDesc(class_desc), class_data: Some(class_datas[i].clone())};
+                                }
+
+                                arr.push(Value::Object(Object::NewObject(object)));
+                            } else {
+                                arr.push(Value::Object(self.read_object(bytes)?));
+                            }
+                            
                         }
                         if bytes[self.buf] != TC_ENDBLOCKDATA {return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf], self.buf))}
                         self.buf += 1;
+                        //The array of values is never returned...
+                        //Maybe try fixing this you dummy
+                        values.push(Value::Array(arr));
 
                     },
                     _ => {
@@ -998,10 +1047,56 @@ impl Deserializer {
                         for i in 0..len as usize {
                             if bytes[self.buf] == TC_ENDBLOCKDATA { self.buf += 1; }
                             if i >= fields.len() { return Err(DeserializeError::IndexOutOfBounds(i, fields.len()))}
-                            let code: char = fields[i].get_typecode()?;
-                            println!("Here is the expected field: {}", fields[i].get_field_name()?);
-                            values.push(self.read_value(bytes,code)?);
-                            
+
+
+                            if self.buf < bytes.len()-1 && bytes[self.buf] == TC_OBJECT && bytes[self.buf + 1] == TC_REFERENCE {
+                                self.buf += 1;
+                                //Read the reference in as a class description
+                                let new_class_desc: NewClassDesc = self.read_reference(bytes)?.get_new_class_desc()?;
+                                let mut super_class: ClassDesc = new_class_desc.get_class_desc_info()?.unwrap().super_class_desc.class_desc;
+
+                                let mut class_descs: Vec<ClassDesc> = Vec::new();
+                                class_descs.push(ClassDesc::NewClassDesc(new_class_desc.clone()));
+                                
+                                while !matches!(super_class, ClassDesc::Null) {
+                                    class_descs.push(super_class.clone());
+                                    super_class = super_class.clone().get_new_class_desc()?.get_class_desc_info()?.unwrap().super_class_desc.class_desc;
+                                }
+
+                                let mut class_datas: Vec<ClassData> = Vec::new();
+
+                                for i in 0..class_descs.len() {
+                                    class_datas.push(self.read_class_data(bytes, class_descs[class_descs.len()-i-1].clone())?);
+                                } 
+
+                                //Rebuild new class
+                                //Start with super class first
+                                //Get last ClassDesc
+                                //Get last ClassDescInfo
+                                //Set SuperClass to Null/None  
+                                //Get last Class
+                                // 
+
+                                //New Object
+
+                                let mut object: NewObject = NewObject {class_desc: ClassDesc::Null, class_data: None};
+
+                                for i in 0..class_datas.len() {
+                                    let mut class_desc: NewClassDesc  = class_descs[class_descs.len()-i-1].clone().get_new_class_desc()?;
+                                    let name: String = class_desc.get_class_name()?;
+                                    let uuid: i64 = class_desc.get_serial_version_uuid()?;
+                                    let mut info: ClassDescInfo = class_desc.get_class_desc_info()?.unwrap();
+                                    info.super_class_desc = Box::new(object.clone());
+                                    class_desc = NewClassDesc::ClassDesc(name, uuid, Some(info));
+                                    object = NewObject {class_desc: ClassDesc::NewClassDesc(class_desc), class_data: Some(class_datas[i].clone())};
+                                }
+
+                                values.push(Value::Object(Object::NewObject(object)));
+                            } else {
+                                let code: char = fields[i].get_typecode()?;
+                                println!("Here is the expected field: {}", fields[i].get_field_name()?);
+                                values.push(self.read_value(bytes,code)?);
+                            }   
                         }
                     }
                 }
@@ -1131,7 +1226,7 @@ impl Deserializer {
             _ => return Err(DeserializeError::InvalidObjectTypecode(bytes[self.buf],self.buf))
         };
 
-        //println!("Value is: {:?}", value);
+        println!("Value is: {:?}", value);
         Ok(value)
     }
 

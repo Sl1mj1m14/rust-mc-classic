@@ -2,13 +2,13 @@ mod serialize;
 mod from_stream;
 
 use flate2::read::GzDecoder;
-use from_stream::{i16_fs, f32_fs, i64_fs, str_fs, u16_fs, u32_fs, u64_fs};
+use from_stream::{i16_fs, i32_fs, f32_fs, i64_fs, str_fs, u16_fs, u32_fs, u64_fs};
 use serialize::{Deserializer,DeserializeError};
 
 use std::fs::read;
 use std::io::Read;
 
-use thiserror::Error;
+//use thiserror::Error;
 
 use mc_classic_js as js;
 
@@ -16,10 +16,11 @@ use mc_classic_js as js;
 fn main() {
     println!("Hello, world!");
 
-    let temp_float = f32_fs(0, &[63, 0, 0, 0]);
+    let temp_float = f32_fs(0, &[63, 51, 51, 51]);
     println!("I really hope this is a value that makes sense: {}", temp_float);
 
-    let input: String = String::from("test/level4.dat");
+    //return;
+    let input: String = String::from("test/Classic Levels/level_30_s.mine");
     let output: String = String::from("test/data.sqlite");
     let level: Level = read_level(input);
     println!("File is read");
@@ -61,6 +62,11 @@ pub struct Level {
     cloudColor: Option<i64>, //0.0.25_05_st
     fogColor: Option<i64>, //0.0.25_05_st
     skyColor: Option<i64>, //0.0.25_05_st
+    //createMode //28_01
+    //waterLevel 
+    //blockMap
+    //player
+    //growTrees //29
 }
 
 impl Level {
