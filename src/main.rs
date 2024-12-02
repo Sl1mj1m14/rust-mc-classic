@@ -59,14 +59,17 @@ pub struct Level {
     unprocessed: Option<i32>, //0.0.14a_08
     entities: Option<Vec<Entity>>, //0.0.14a_08 - Removed 0.25_05_st
     networkMode: Option<bool>, //0.0.19a_04
-    cloudColor: Option<i64>, //0.0.25_05_st
-    fogColor: Option<i64>, //0.0.25_05_st
-    skyColor: Option<i64>, //0.0.25_05_st
-    //createMode //28_01
-    //waterLevel 
-    //blockMap
-    //player
-    //growTrees //29
+    cloudColor: Option<i32>, //0.0.25_05_st
+    fogColor: Option<i32>, //0.0.25_05_st
+    skyColor: Option<i32>, //0.0.25_05_st
+    waterLevel: Option<i32>, //0.0.25_05_st
+    player: Option<Entity>, //0.0.25_05_st
+    //blockMap was added and the only thing of use it holds is the entity list
+    //blockMap therefore just gets parsed into entities
+    //Note the player is not included in this list when parsed
+    //blockMap: Option<BlockMap> //0.0.25_05_st
+    creativeMode: Option<bool>, //0.0.28_01
+    growTrees: Option<bool> //0.0.29
 }
 
 impl Level {
@@ -90,12 +93,20 @@ impl Level {
             networkMode: None,
             cloudColor: None,
             fogColor: None,
-            skyColor: None
+            skyColor: None,
+            waterLevel: None,
+            player: None,
+            creativeMode: None,
+            growTrees: None
         }
     }
 }
 
 pub struct Entity {
+
+}
+
+pub struct Player {
 
 }
 
@@ -213,6 +224,12 @@ pub fn classic_to_level (bytes: Vec<u8>) -> Result<Level, DeserializeError> {
             "ySpawn" => { level.zSpawn = Some(values[i].get_integer()?) },
             "zSpawn" => { level.ySpawn = Some(values[i].get_integer()?) },
             "networkMode" => { level.networkMode = Some(values[i].get_boolean()?) },
+            "cloudColor" => { level.cloudColor = Some(values[i].get_integer()?) },
+            "fogColor" => { level.fogColor = Some(values[i].get_integer()?) },
+            "skyColor" => { level.skyColor = Some(values[i].get_integer()?) },
+            "waterLevel" => { level.waterLevel = Some(values[i].get_integer()?) },
+            "creativeMode" => { level.creativeMode = Some(values[i].get_boolean()?) },
+            "growTrees" => { level.growTrees = Some(values[i].get_boolean()?) },
             "blocks" => { 
                 let wrapped: Vec<serialize::Value> = values[i].get_array()?; 
                 let mut blocks: Vec<u8> = Vec::new();
@@ -224,10 +241,12 @@ pub fn classic_to_level (bytes: Vec<u8>) -> Result<Level, DeserializeError> {
             "creator" => { 
                 level.creator = values[i].get_object()?.get_new_string()?.string; 
             },
-            "entities" => { () }, //ADD SUPPORT FOR ARRAY LIST TYPES IN THE FUTURE!!
             "name" => { 
                 level.creator = values[i].get_object()?.get_new_string()?.string; 
             },
+            "entities" => { () }, //ADD SUPPORT FOR ARRAY LIST TYPES IN THE FUTURE!!
+            "blockMap" => { () }, //ADD SUPPORT FOR PARSING BLOCKMAPS INTO ENTITY LISTS & PLAYER
+            "player" => { println!("{:?}", values[i].get_object()) }, //ADD SUPPORT FOR PARSING THE PLAYER
             _ => println!("Unexpected Field: {}", fields.field_descs[i].get_field_name()?.as_str())
 
         }
