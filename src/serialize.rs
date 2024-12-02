@@ -919,7 +919,7 @@ impl Deserializer {
         if index >= self.handles.len() { return Err(DeserializeError::IndexOutOfBounds(index, self.handles.len()))}
         //if self.buf == 3004 + 1 + 4 {
             //println!("Here is #27: {:?}",self.handles[27].clone());
-            println!("Here is REFERENCE: {:?}",self.handles[index].clone());
+            //println!("Here is REFERENCE: {:?}",self.handles[index].clone());
             //println!("{:?}",&bytes[self.buf..self.buf+100]);
         //}
         Ok(self.handles[index].clone())
@@ -988,6 +988,11 @@ impl Deserializer {
                                 self.buf += 1;
                                 //Read the reference in as a class description
                                 let new_class_desc: NewClassDesc = self.read_reference(bytes)?.get_new_class_desc()?;
+
+                                let tmp_obj = NewObject { class_desc: ClassDesc::NewClassDesc(new_class_desc.clone()), class_data: None };
+                                let index = self.handles.len();
+                                self.handles.push(Object::NewObject(tmp_obj.clone()));
+
                                 let mut super_class: ClassDesc = new_class_desc.get_class_desc_info()?.unwrap().super_class_desc.class_desc;
 
                                 let mut class_descs: Vec<ClassDesc> = Vec::new();
@@ -1025,6 +1030,8 @@ impl Deserializer {
                                     class_desc = NewClassDesc::ClassDesc(name, uuid, Some(info));
                                     object = NewObject {class_desc: ClassDesc::NewClassDesc(class_desc), class_data: Some(class_datas[i].clone())};
                                 }
+
+                                self.handles[index] = Object::NewObject(object.clone());
 
                                 arr.push(Value::Object(Object::NewObject(object)));
                             } else {
@@ -1055,6 +1062,10 @@ impl Deserializer {
                                 let new_class_desc: NewClassDesc = self.read_reference(bytes)?.get_new_class_desc()?;
                                 let mut super_class: ClassDesc = new_class_desc.get_class_desc_info()?.unwrap().super_class_desc.class_desc;
 
+                                let tmp_obj = NewObject { class_desc: ClassDesc::NewClassDesc(new_class_desc.clone()), class_data: None };
+                                let index = self.handles.len();
+                                self.handles.push(Object::NewObject(tmp_obj.clone()));
+
                                 let mut class_descs: Vec<ClassDesc> = Vec::new();
                                 class_descs.push(ClassDesc::NewClassDesc(new_class_desc.clone()));
                                 
@@ -1090,6 +1101,8 @@ impl Deserializer {
                                     class_desc = NewClassDesc::ClassDesc(name, uuid, Some(info));
                                     object = NewObject {class_desc: ClassDesc::NewClassDesc(class_desc), class_data: Some(class_datas[i].clone())};
                                 }
+
+                                self.handles[index] = Object::NewObject(object.clone());
 
                                 values.push(Value::Object(Object::NewObject(object)));
                             } else {
