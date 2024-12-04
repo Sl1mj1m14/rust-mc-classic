@@ -193,22 +193,22 @@ pub fn classic_to_level (bytes: Vec<u8>) -> Result<Level, DeserializeError> {
    println!("{}",&bytes[buf..].len());
 
     let mut deserializer: Deserializer = Deserializer::new();
-    let contents: Vec<serialize::Content> = deserializer.deserialize(&bytes[buf..])?;
+    let contents: Vec<serialize::Object> = deserializer.deserialize(&bytes[buf..])?;
     println!("Contents: {}", contents.len());
 
     if contents.len() != 1 { return Err(DeserializeError::InvalidContentLength(1, contents.len())) }
 
-    let object: serialize::NewObject = contents[0].get_object()?.get_new_object()?;
+    let object: serialize::NewObject = contents[0].get_new_object()?;
 
     let class_info: serialize::NewClassDesc = object.class_desc.get_new_class_desc()?;
     let class_data: serialize::ClassData = object.class_data.unwrap();
 
-    if class_info.get_class_name()? != "com.mojang.minecraft.level.Level" {
-        return Err(DeserializeError::InvalidClass(class_info.get_class_name()?.clone()))
+    if class_info.class_name != "com.mojang.minecraft.level.Level" {
+        return Err(DeserializeError::InvalidClass(class_info.class_name.clone()))
     }
 
-    let fields: serialize::Fields = class_info.get_class_desc_info()?.unwrap().fields;
-    let values: Vec<serialize::Value> = class_data.get_values()?;
+    let fields: serialize::Fields = class_info.class_desc_info.unwrap().fields;
+    let values: Vec<serialize::Value> = class_data.values;
 
     for i in 0..fields.count as usize {
         match fields.field_descs[i].get_field_name()?.as_str() {
