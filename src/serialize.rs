@@ -443,9 +443,7 @@ impl Deserializer {
         Ok(new_array)
     }
 
-    //Clean up string
     pub fn read_new_string (&mut self, bytes: &[u8]) -> Result<NewString,DeserializeError> {
-        println!("Uh oh - this is a string, here is the byte we entered this bad boy: {} and it's {}",self.buf,bytes[self.buf]);
         match bytes[self.buf] {
             TC_STRING => {
                 self.buf += 1;
