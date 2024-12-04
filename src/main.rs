@@ -14,15 +14,14 @@ use mc_classic_js as js;
 
 
 fn main() {
-    println!("Hello, world!");
 
-    let temp_float = f32_fs(0, &[63, 51, 51, 51]);
-    println!("I really hope this is a value that makes sense: {}", temp_float);
-
-    //return;
-    let input: String = String::from("test/Classic Levels/level_29_01.dat");
-    let output: String = String::from("test/data.sqlite");
-    let level: Level = read_level(input);
+    let mut input: String = String::from("test/Classic Levels/level_30_s.mine");
+    //let output: String = String::from("test/data.sqlite");
+    let mut level: Level = read_level(input);
+    input = String::from("test/Classic Levels/level_14a_08.dat");
+    level = read_level(input);
+    input = String::from("test/Classic Levels/level_25_05_st.dat");
+    level = read_level(input);
     println!("File is read");
 
     return;
@@ -34,7 +33,7 @@ fn main() {
 
     let json_string: String = js::serialize_saved_game_from_seed(1, tile_map);
     println!("Json is prepped");
-    js::write_saved_game(output, json_string).expect("Uh oh!");
+    //js::write_saved_game(output, json_string).expect("Uh oh!");
     println!("File has been written");
 
 
@@ -244,31 +243,23 @@ pub fn classic_to_level (bytes: Vec<u8>) -> Result<Level, DeserializeError> {
             "name" => { 
                 level.creator = values[i].get_object()?.get_new_string()?.string; 
             },
-            "entities" => { () }, //ADD SUPPORT FOR ARRAY LIST TYPES IN THE FUTURE!!
-            "blockMap" => { () }, //ADD SUPPORT FOR PARSING BLOCKMAPS INTO ENTITY LISTS & PLAYER
-            "player" => { println!("{:?}", values[i].get_object()) }, //ADD SUPPORT FOR PARSING THE PLAYER
+            "entities" => { //ADD SUPPORT FOR ARRAY LIST TYPES IN THE FUTURE!!
+                () 
+            }, 
+            "blockMap" => { //ADD SUPPORT FOR PARSING BLOCKMAPS INTO ENTITY LISTS & PLAYER
+                //println!("{:?}", values[i].get_object())  
+            }, 
+            "player" => { //ADD SUPPORT FOR PARSING THE PLAYER
+                println!("{:?}", values[i].get_object()) 
+            }, 
             _ => println!("Unexpected Field: {}", fields.field_descs[i].get_field_name()?.as_str())
 
         }
     }
 
-    //println!("Class Name: {:?}", contents[0].get_object()?.get_new_object()?.class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap());
-    //println!("Values: {:?}", &contents[0].get_object()?.get_new_object()?.class_data.unwrap().get_values()?[0..9]);
-    //println!("Values: {:?}", &contents[0].get_object()?.get_new_object()?.class_data.unwrap().get_values()?[11..14]);
-    //println!("{:?}", contents[1]);
-    //println!("{:?}", contents[0].get_object()?.get_new_object()?.class_desc.get_new_class_desc()?.get_class_name()?);
-
-    //println!("{:#?}",contents);
-    //class_desc.get_new_class_desc()?.get_class_desc_info()?.unwrap();
     println!("HOLY CRAP SWEET LORD ABOVE IT ACTUALLY WORKED YOU INSANE IDIOT!!!!!!!");
 
-
-
-    return Ok(level);
-
-    //Need to read through the entire file and determine all values
-    //No idea how to do this?
-    //Going to have to implement java serialization seemingly...
+    Ok(level)
 }
 
 pub fn classic_id_to_js_id (tile_map: Vec<u8>) -> Vec<u8> {
