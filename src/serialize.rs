@@ -15,8 +15,9 @@ pub const TC_ENDBLOCKDATA: u8 = 0x78;
 pub const TC_LONGSTRING: u8 =  0x7C;
 pub const BASE_WIRE_HANDLE: i32 = 0x7E0000;
 pub const CC_ARRAYLIST: &str = "java.util.ArrayList";
+pub const STR_LEN: i32 = 65536;
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub enum Object {
     NewObject(NewObject),
     NewClass(NewClass),
@@ -71,7 +72,7 @@ impl Object {
     }
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct NewObject {
     //TC_OBJECT
     pub class_desc: ClassDesc,
@@ -79,14 +80,14 @@ pub struct NewObject {
     pub class_data: Option<ClassData>
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct NewClass {
     //TC_CLASS
     pub class_desc: ClassDesc
     //newHandle
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct NewArray {
     //TC_ARRAY
     pub class_desc: ClassDesc,
@@ -95,7 +96,7 @@ pub struct NewArray {
     pub values: Option<Vec<Value>>
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct NewString {
     //TC_LONGSTRING || TC_STRING
     //newHandle
@@ -103,7 +104,7 @@ pub struct NewString {
     pub string: Option<String> 
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct NewClassDesc {
         //TC_CLASSDESC 
         pub class_name: String,
@@ -112,7 +113,7 @@ pub struct NewClassDesc {
         pub class_desc_info: Option<ClassDescInfo>
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub enum ClassDesc {
     NewClassDesc(NewClassDesc),
     Null
@@ -134,12 +135,12 @@ impl ClassDesc {
     }
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct ClassData {
     pub values: Vec<Value>
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct ClassDescInfo {
     pub class_desc_flags: u8,
     pub fields: Fields,
@@ -147,13 +148,13 @@ pub struct ClassDescInfo {
     pub super_class_desc: Box<ClassDesc>
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct Fields {
     pub count: i16,
     pub field_descs: Vec<FieldDesc> //Array length is count
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub enum ClassAnnotation {
     EndBlockData, //TC_ENDBLOCKDATA
     Contents(
@@ -178,7 +179,7 @@ impl ClassAnnotation {
     }
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub enum FieldDesc {
     PrimitiveDesc(
         char,   //prim_typecode
@@ -214,7 +215,7 @@ impl FieldDesc {
     }
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub enum Value {
     Byte(u8),
     Char(char),
@@ -327,7 +328,7 @@ pub enum DeserializeError {
     Unimplemented(String)
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone,Debug,PartialEq)]
 pub struct Deserializer {
     buf: usize,
     handles: Vec<Object>,
@@ -685,5 +686,257 @@ impl Deserializer {
         if contents.len() > 0 {return Ok(ClassAnnotation::Contents(contents))}
         self.buf += 1;
         Ok(ClassAnnotation::EndBlockData)
+    }
+}
+
+#[derive(Clone,Debug,PartialEq)]
+
+pub struct Serializer {
+    pub bytes: Vec<u8>,
+    pub handles: Vec<Object>
+}
+
+impl Serializer {
+
+    pub fn new () -> Self {
+        let bytes: Vec<u8> = Vec::new();
+        let handles: Vec<Object> = Vec::new();
+        Serializer { bytes: bytes, handles: handles }
+    }
+
+    pub fn serialize (&mut self, contents: Vec<Object>) -> Result<&[u8],DeserializeError> {
+        self.bytes.extend_from_slice(&STREAM_MAGIC.to_be_bytes());
+        self.bytes.extend_from_slice(&STREAM_VERSION.to_be_bytes());
+
+        for object in contents {
+            self.write_object(object)?;
+        }
+
+        Ok(&self.bytes)
+    }
+
+    pub fn write_object (&mut self, object: Object) -> Result<(),DeserializeError> {
+        match object {
+            Object::NewObject(obj) => self.write_new_object(obj)?,
+            Object::NewClass(class) => self.write_new_class(class)?,
+            Object::NewArray(arr) => self.write_new_array(arr)?,
+            Object::NewString(str) => self.write_new_string(str)?,
+            Object::NewClassDesc(class) => self.write_new_class_desc(class)?,
+            Object::Null => self.bytes.push(TC_NULL)
+        }
+
+        Ok(())
+    }
+
+    pub fn write_new_object (&mut self, new_object: NewObject) -> Result<(),DeserializeError> {
+        let index = self.find_handle(Object::NewObject(new_object.clone()))?;
+        if index > -1 {
+            self.bytes.push(TC_REFERENCE);
+            self.bytes.extend_from_slice(&index.to_be_bytes());
+            return Ok(())
+        }
+
+        self.bytes.push(TC_OBJECT);
+
+        self.write_class_desc(new_object.class_desc.clone())?;
+
+        self.handles.push(Object::NewObject(new_object.clone()));
+
+        if new_object.class_data.is_none() { return Ok(()) }
+        self.write_class_data(new_object.class_data.unwrap(), new_object.class_desc.get_new_class_desc()?.class_name)?;
+
+        Ok(())
+    }
+
+    pub fn write_new_class (&mut self, new_class: NewClass) -> Result<(),DeserializeError> {
+        let index = self.find_handle(Object::NewClass(new_class.clone()))?;
+        if index > -1 {
+            self.bytes.push(TC_REFERENCE);
+            self.bytes.extend_from_slice(&index.to_be_bytes());
+            return Ok(())
+        }
+
+        self.bytes.push(TC_CLASS);
+
+        self.write_class_desc(new_class.class_desc.clone())?;
+
+        self.handles.push(Object::NewClass(new_class));
+
+        Ok(())
+    }
+
+    pub fn write_new_array (&mut self, new_array: NewArray) -> Result<(),DeserializeError> {
+        let index = self.find_handle(Object::NewArray(new_array.clone()))?;
+        if index > -1 {
+            self.bytes.push(TC_REFERENCE);
+            self.bytes.extend_from_slice(&index.to_be_bytes());
+            return Ok(())
+        }
+
+        self.bytes.push(TC_ARRAY);
+
+        self.write_class_desc(new_array.class_desc.clone())?;
+
+        self.handles.push(Object::NewArray(new_array.clone()));
+
+        self.bytes.extend_from_slice(&new_array.size.unwrap_or(0).to_be_bytes());
+
+        if new_array.values.is_none() { return Ok(()) }
+
+        for value in new_array.values.unwrap() {
+            self.write_value(value)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn write_new_string (&mut self, new_string: NewString) -> Result<(),DeserializeError> {
+        let index = self.find_handle(Object::NewString(new_string.clone()))?;
+        if index > -1 {
+            self.bytes.push(TC_REFERENCE);
+            self.bytes.extend_from_slice(&index.to_be_bytes());
+            return Ok(())
+        }
+
+        if new_string.string.is_none() { return Ok(()) }
+        self.handles.push(Object::NewString(new_string.clone()));
+
+        let chars: Vec<char> = new_string.string.unwrap().chars().collect();
+
+        if chars.len() as i32 >= STR_LEN {
+            self.bytes.push(TC_LONGSTRING);
+            self.bytes.extend_from_slice(&(chars.len() as i32).to_be_bytes());
+        } else {
+            self.bytes.push(TC_STRING);
+            self.bytes.extend_from_slice(&(chars.len() as i16).to_be_bytes());
+        }
+
+        for ch in chars { self.bytes.push(ch as u8); }
+
+        Ok(())
+    }
+
+    pub fn write_new_class_desc (&mut self, new_class_desc: NewClassDesc) -> Result<(),DeserializeError> {
+        let index = self.find_handle(Object::NewClassDesc(new_class_desc.clone()))?;
+        if index > -1 {
+            self.bytes.push(TC_REFERENCE);
+            self.bytes.extend_from_slice(&index.to_be_bytes());
+            return Ok(())
+        }
+
+        self.bytes.push(TC_CLASSDESC);
+
+        let chars: Vec<char> = new_class_desc.class_name.chars().collect();
+        self.bytes.extend_from_slice(&(chars.len() as i16).to_be_bytes());
+        for ch in chars { self.bytes.push(ch as u8); }
+
+        self.bytes.extend_from_slice(&new_class_desc.uuid.to_be_bytes());
+
+        self.handles.push(Object::NewClassDesc(new_class_desc.clone()));
+
+        if new_class_desc.class_desc_info.is_none() { return Ok(()) }
+        self.write_class_desc_info(new_class_desc.class_desc_info.unwrap())?;
+
+        Ok(())
+    }
+
+    pub fn write_class_desc (&mut self, class_desc: ClassDesc) -> Result<(),DeserializeError> {
+        match class_desc {
+            ClassDesc::NewClassDesc(new_class_desc) => self.write_new_class_desc(new_class_desc)?,
+            ClassDesc::Null => self.bytes.push(TC_NULL)
+        }
+
+        Ok(())
+    }
+
+    pub fn write_class_data (&mut self, class_data: ClassData, class_name: String) -> Result<(),DeserializeError> {
+        match class_name.as_str() {
+            CC_ARRAYLIST => {
+                if class_data.values.len() != 2 {/*throw error here*/}
+
+                self.write_value(class_data.values[0].clone())?;
+
+                self.bytes.push(TC_BLOCKDATA);
+                self.bytes.push(3); //This value is just in arrayLists for some reason, I have no idea either...
+                self.write_value(class_data.values[0].clone())?;
+
+                if !matches!(class_data.values[1],Value::Array(_)) {/*throw error here*/}
+                self.write_value(class_data.values[1].clone())?;
+                self.bytes.push(TC_ENDBLOCKDATA);
+            },
+            _ => {
+                for value in class_data.values {
+                    self.write_value(value)?
+                    //Handle the fact that weird ENDBLOCKDATA bits just show up here...
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn write_class_desc_info (&mut self, class_desc_info: ClassDescInfo) -> Result<(),DeserializeError> {
+        self.bytes.push(class_desc_info.class_desc_flags);
+        self.write_fields(class_desc_info.fields)?;
+        self.write_class_annotation(class_desc_info.class_annotation)?;
+        self.write_class_desc(*class_desc_info.super_class_desc)?;
+        Ok(())
+    }
+
+    pub fn write_fields (&mut self, fields: Fields) -> Result<(),DeserializeError> {
+        self.bytes.extend_from_slice(&fields.count.to_be_bytes());
+        for desc in fields.field_descs { self.write_field_desc(desc)? }
+        Ok(())
+    }
+
+    pub fn write_class_annotation (&mut self, class_annotation: ClassAnnotation) -> Result<(),DeserializeError> {
+        match class_annotation {
+            ClassAnnotation::EndBlockData => self.bytes.push(TC_ENDBLOCKDATA),
+            ClassAnnotation::Contents(x) => for y in x { self.write_object(y)? }
+        }
+        Ok(())
+    }
+
+    pub fn write_field_desc (&mut self, field_desc: FieldDesc) -> Result<(),DeserializeError> {
+
+        self.bytes.push(field_desc.get_typecode()?.clone() as u8);
+
+        let chars: Vec<char> = field_desc.clone().get_field_name()?.chars().collect();
+        self.bytes.extend_from_slice(&(chars.len() as i16).to_be_bytes());
+        for ch in chars { self.bytes.push(ch as u8) }
+
+        if matches!(field_desc.clone(), FieldDesc::ObjectDesc(_,_,_)) {
+            let ftype = field_desc.get_field_type()?;
+            self.write_new_string(NewString { string: Some(ftype) })?;
+        }
+
+        Ok(())
+    }
+
+    pub fn write_value (&mut self, value: Value) -> Result<(),DeserializeError> {
+        match value {
+            Value::Byte(x) => self.bytes.push(x),
+            Value::Char(x) => self.bytes.push(x as u8),
+            Value::Double(x) => self.bytes.extend_from_slice(&x.to_be_bytes()),
+            Value::Float(x) => self.bytes.extend_from_slice(&x.to_be_bytes()),
+            Value::Integer(x) => self.bytes.extend_from_slice(&x.to_be_bytes()),
+            Value::Short(x) => self.bytes.extend_from_slice(&x.to_be_bytes()),
+            Value::Long(x) => self.bytes.extend_from_slice(&x.to_be_bytes()),
+            Value::Boolean(x) => self.bytes.push(x as u8),
+            Value::Object(x) => self.write_object(x)?,
+            Value::Array(x) => {
+                for y in x {
+                    self.write_value(y)?
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn find_handle (&mut self, object: Object) -> Result<i32,DeserializeError> {
+        for i in 0..self.handles.len() {
+            if object == self.handles[i] { return Ok(BASE_WIRE_HANDLE + i as i32) }
+        }
+
+        Ok(-1)
     }
 }

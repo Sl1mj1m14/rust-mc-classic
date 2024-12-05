@@ -3,9 +3,9 @@ mod from_stream;
 
 use flate2::read::GzDecoder;
 use from_stream::{i16_fs, i32_fs, f32_fs, i64_fs, str_fs, u16_fs, u32_fs, u64_fs};
-use serialize::{Deserializer,DeserializeError};
+use serialize::{Deserializer,Serializer,DeserializeError};
 
-use std::fs::read;
+use std::fs::{self, read};
 use std::io::Read;
 
 //use thiserror::Error;
@@ -18,10 +18,10 @@ fn main() {
     let mut input: String = String::from("test/Classic Levels/level_30_s.mine");
     //let output: String = String::from("test/data.sqlite");
     let mut level: Level = read_level(input);
-    input = String::from("test/Classic Levels/level_14a_08.dat");
-    level = read_level(input);
-    input = String::from("test/Classic Levels/level_25_05_st.dat");
-    level = read_level(input);
+    //input = String::from("test/Classic Levels/level_14a_08.dat");
+    //level = read_level(input);
+    //input = String::from("test/Classic Levels/level_25_05_st.dat");
+    //level = read_level(input);
     println!("File is read");
 
     return;
@@ -194,6 +194,25 @@ pub fn classic_to_level (bytes: Vec<u8>) -> Result<Level, DeserializeError> {
 
     let mut deserializer: Deserializer = Deserializer::new();
     let contents: Vec<serialize::Object> = deserializer.deserialize(&bytes[buf..])?;
+
+    //DEBUG
+
+    let mut serializer: Serializer = Serializer::new();
+    let test_bytes = serializer.serialize(contents.clone())?;
+    println!("{}", test_bytes.len());
+
+    //fs::write("test/file_bytes.txt", bytes).expect("AHHHHHHH I'M ON FIREEEEE");
+    //fs::write("test/serialized_bytes.txt", test_bytes).expect("AHHHHHHH I'M ON FIREEEEE - again");
+
+    let tmp_num = 2000;
+    println!("{:?}", &bytes[tmp_num+5..tmp_num+1005]);
+    println!("");
+    println!("");
+    println!("");
+    println!("{:?}", &test_bytes[tmp_num..tmp_num+1000]);
+
+
+    //DEBUG
     println!("Contents: {}", contents.len());
 
     if contents.len() != 1 { return Err(DeserializeError::InvalidContentLength(1, contents.len())) }
@@ -250,7 +269,7 @@ pub fn classic_to_level (bytes: Vec<u8>) -> Result<Level, DeserializeError> {
                 //println!("{:?}", values[i].get_object())  
             }, 
             "player" => { //ADD SUPPORT FOR PARSING THE PLAYER
-                println!("{:?}", values[i].get_object()) 
+                //println!("{:?}", values[i].get_object()) 
             }, 
             _ => println!("Unexpected Field: {}", fields.field_descs[i].get_field_name()?.as_str())
 
