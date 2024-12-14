@@ -15,6 +15,7 @@ pub const TC_ENDBLOCKDATA: u8 = 0x78;
 pub const TC_LONGSTRING: u8 =  0x7C;
 pub const BASE_WIRE_HANDLE: i32 = 0x7E0000;
 pub const CC_ARRAYLIST: &str = "java.util.ArrayList";
+pub const CC_RANDOM: &str = "java.util.Random";
 pub const STR_LEN: i32 = 65536;
 
 #[derive(Clone,Debug,PartialEq)]
@@ -362,6 +363,8 @@ impl Deserializer {
 
         self.read_contents(bytes)?;
 
+        println!("{:?}", self.handles[6]);
+
         Ok(self.contents.clone())
     }
 
@@ -573,10 +576,16 @@ impl Deserializer {
                 for i in 0..fields.len() {
                     let list: Vec<FieldDesc> = fields[fields.len()-i-1].clone();
 
+                    let mut tmp_field: FieldDesc = FieldDesc::PrimitiveDesc('a', "b".to_string());
                     for field in list {
-                        if bytes[self.buf] == TC_ENDBLOCKDATA { self.buf += 1; }
+                        if bytes[self.buf] == TC_ENDBLOCKDATA { 
+                            println!("Previous field was: {:?}", tmp_field.clone());
+                            println!("Current field is: {:?}", field);
+                            self.buf += 1; 
+                        }
                         let code: char = field.get_typecode()?;
                         values.push(self.read_value(bytes,code)?); 
+                        tmp_field = field;
                     }
                 }
             }
@@ -712,6 +721,8 @@ impl Serializer {
             self.write_object(object)?;
         }
 
+        println!("{:?}", self.handles[6]);
+
         Ok(&self.bytes)
     }
 
@@ -740,10 +751,13 @@ impl Serializer {
 
         self.write_class_desc(new_object.class_desc.clone())?;
 
-        self.handles.push(Object::NewObject(new_object.clone()));
+        let index = self.handles.len();
+        self.handles.push(Object::NewObject(NewObject { class_desc: new_object.clone().class_desc, class_data: None}));
 
         if new_object.class_data.is_none() { return Ok(()) }
-        self.write_class_data(new_object.class_data.unwrap(), new_object.class_desc.get_new_class_desc()?.class_name)?;
+        self.write_class_data(new_object.clone().class_data.unwrap(), new_object.class_desc.get_new_class_desc()?.class_name)?;
+
+        self.handles[index] = Object::NewObject(new_object.clone());
 
         Ok(())
     }
@@ -777,15 +791,18 @@ impl Serializer {
 
         self.write_class_desc(new_array.class_desc.clone())?;
 
-        self.handles.push(Object::NewArray(new_array.clone()));
+        let index = self.handles.len();
+        self.handles.push(Object::NewArray(NewArray { class_desc: new_array.class_desc.clone(), size: None, values: None }));
 
         self.bytes.extend_from_slice(&new_array.size.unwrap_or(0).to_be_bytes());
 
         if new_array.values.is_none() { return Ok(()) }
 
-        for value in new_array.values.unwrap() {
+        for value in new_array.clone().values.unwrap() {
             self.write_value(value)?;
         }
+
+        self.handles[index] = Object::NewArray(new_array.clone());
 
         Ok(())
     }
@@ -832,10 +849,15 @@ impl Serializer {
 
         self.bytes.extend_from_slice(&new_class_desc.uuid.to_be_bytes());
 
-        self.handles.push(Object::NewClassDesc(new_class_desc.clone()));
+        let index = self.handles.len();
+        self.handles.push(Object::NewClassDesc(
+            NewClassDesc { class_name: new_class_desc.class_name.clone(), uuid: new_class_desc.uuid.clone(), class_desc_info: None }
+        ));
 
         if new_class_desc.class_desc_info.is_none() { return Ok(()) }
-        self.write_class_desc_info(new_class_desc.class_desc_info.unwrap())?;
+        self.write_class_desc_info(new_class_desc.clone().class_desc_info.unwrap())?;
+
+        self.handles[index] = (Object::NewClassDesc(new_class_desc.clone()));
 
         Ok(())
     }
@@ -864,10 +886,15 @@ impl Serializer {
                 self.write_value(class_data.values[1].clone())?;
                 self.bytes.push(TC_ENDBLOCKDATA);
             },
+            CC_RANDOM => {
+                for value in class_data.values {
+                    self.write_value(value)?
+                }
+                self.bytes.push(TC_ENDBLOCKDATA);
+            }
             _ => {
                 for value in class_data.values {
                     self.write_value(value)?
-                    //Handle the fact that weird ENDBLOCKDATA bits just show up here...
                 }
             }
         }
@@ -933,10 +960,36 @@ impl Serializer {
     }
 
     pub fn find_handle (&mut self, object: Object) -> Result<i32,DeserializeError> {
-        for i in 0..self.handles.len() {
-            if object == self.handles[i] { return Ok(BASE_WIRE_HANDLE + i as i32) }
-        }
+        
+        let mut i = 0;
+        for handle in self.handles.clone() {
 
+            if handle.clone() == object.clone() { return Ok(BASE_WIRE_HANDLE + i as i32) }
+
+            match (object.clone(), handle.clone()) {
+                (Object::NewObject(_), Object::NewObject(_)) => {
+                    if handle.clone().get_new_object()?.class_data.is_none()
+                    && object.clone().get_new_object()?.class_desc == handle.get_new_object()?.class_desc {
+                        return Ok(BASE_WIRE_HANDLE + i as i32)
+                    }
+                },
+                (Object::NewArray(_), Object::NewArray(_)) => {
+                    if handle.clone().get_new_array()?.values.is_none()
+                    && object.clone().get_new_array()?.class_desc == handle.get_new_array()?.class_desc {
+                        return Ok(BASE_WIRE_HANDLE + i as i32)
+                    }
+                },
+                (Object::NewClassDesc(_), Object::NewClassDesc(_)) => {
+                    if handle.clone().get_new_class_desc()?.class_desc_info.is_none()
+                    && object.clone().get_new_class_desc()?.class_name == handle.get_new_class_desc()?.class_name {
+                        return Ok(BASE_WIRE_HANDLE + i as i32)
+                    }
+
+                }
+                _ => ()
+            }
+            i += 1;            
+        }
         Ok(-1)
     }
 }

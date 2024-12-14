@@ -202,7 +202,7 @@ pub fn classic_to_level (bytes: Vec<u8>) -> Result<Level, DeserializeError> {
     println!("{}", test_bytes.len());
 
     //fs::write("test/file_bytes.txt", bytes).expect("AHHHHHHH I'M ON FIREEEEE");
-    //fs::write("test/serialized_bytes.txt", test_bytes).expect("AHHHHHHH I'M ON FIREEEEE - again");
+    fs::write("test/serialized_bytes.txt", test_bytes).expect("AHHHHHHH I'M ON FIREEEEE - again");
 
     let tmp_num = 2000;
     println!("{:?}", &bytes[tmp_num+5..tmp_num+1005]);
