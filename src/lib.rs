@@ -16,33 +16,33 @@ use thiserror::Error;
 
 #[derive(Default,Clone)]
 pub struct Level {
-    blocks: Option<Vec<u8>>, //pc-132211
-    version: Option<u8>, //0.0.13a-dev
-    name: Option<String>, //0.0.13a-dev
-    creator: Option<String>, //0.0.13a-dev
-    createTime: Option<i64>, //0.0.13a-dev
-    width: Option<i32>, //0.0.13a-dev
-    height: Option<i32>, //0.0.13a-dev
-    depth: Option<i32>, //0.0.13a-dev
-    xSpawn: Option<i32>, //0.0.14a_08
-    ySpawn: Option<i32>, //0.0.14a_08
-    zSpawn: Option<i32>, //0.0.14a_08
-    rotSpawn: Option<f32>, //0.0.14a_08
-    tickCount: Option<i32>, //0.0.14a_08
-    unprocessed: Option<i32>, //0.0.14a_08
-    entities: Option<Vec<Entity>>, //0.0.14a_08 - Removed 0.25_05_st
-    networkMode: Option<bool>, //0.0.19a_04
-    cloudColor: Option<i32>, //0.0.25_05_st
-    fogColor: Option<i32>, //0.0.25_05_st
-    skyColor: Option<i32>, //0.0.25_05_st
-    waterLevel: Option<i32>, //0.0.25_05_st
-    player: Option<Player>, //0.0.25_05_st
+    pub blocks: Option<Vec<u8>>, //pc-132211
+    pub version: Option<u8>, //0.0.13a-dev
+    pub name: Option<String>, //0.0.13a-dev
+    pub creator: Option<String>, //0.0.13a-dev
+    pub createTime: Option<i64>, //0.0.13a-dev
+    pub width: Option<i32>, //0.0.13a-dev
+    pub height: Option<i32>, //0.0.13a-dev
+    pub depth: Option<i32>, //0.0.13a-dev
+    pub xSpawn: Option<i32>, //0.0.14a_08
+    pub ySpawn: Option<i32>, //0.0.14a_08
+    pub zSpawn: Option<i32>, //0.0.14a_08
+    pub rotSpawn: Option<f32>, //0.0.14a_08
+    pub tickCount: Option<i32>, //0.0.14a_08
+    pub unprocessed: Option<i32>, //0.0.14a_08
+    pub entities: Option<Vec<Entity>>, //0.0.14a_08 - Removed 0.25_05_st
+    pub networkMode: Option<bool>, //0.0.19a_04
+    pub cloudColor: Option<i32>, //0.0.25_05_st
+    pub fogColor: Option<i32>, //0.0.25_05_st
+    pub skyColor: Option<i32>, //0.0.25_05_st
+    pub waterLevel: Option<i32>, //0.0.25_05_st
+    pub player: Option<Player>, //0.0.25_05_st
     //blockMap was added and the only thing of use it holds is the entity list
     //blockMap therefore just gets parsed into entities
     //Note the player is not included in this list when parsed
     //blockMap: Option<BlockMap> //0.0.25_05_st
-    creativeMode: Option<bool>, //0.0.28_01
-    growTrees: Option<bool> //0.0.29
+    pub creativeMode: Option<bool>, //0.0.28_01
+    pub growTrees: Option<bool> //0.0.29
 }
 
 impl Level {
@@ -180,42 +180,42 @@ impl Entity {
 
 #[derive(Clone)]
 pub struct EntityFields {
-    bbHeight: Option<f32>,
-    bbWidth: Option<f32>,
-    collision: Option<bool>,
-    fallDistance: Option<f32>,
-    footSize: Option<f32>,
-    heightOffset: Option<f32>,
-    horizontalCollision: Option<bool>,
-    hovered: Option<bool>,
-    makeStepSound: Option<bool>,
-    nextStep: Option<i32>,
-    noPhysics: Option<bool>,
-    onGround: Option<bool>,
-    pushthrough: Option<f32>,
-    removed: Option<bool>,
-    slide: Option<bool>,
-    textureId: Option<i32>,
-    walkDist: Option<f32>,
-    walkDistO: Option<f32>,
-    x: Option<f32>,
-    xOld: Option<f32>,
-    xRot: Option<f32>,
-    xRotO: Option<f32>,
-    xd: Option<f32>,
-    xo: Option<f32>,
-    y: Option<f32>,
-    yOld: Option<f32>,
-    yRot: Option<f32>,
-    yRotO: Option<f32>,
-    ySlideOffset: Option<f32>,
-    yd: Option<f32>,
-    yo: Option<f32>,
-    z: Option<f32>,
-    zOld: Option<f32>,
-    zd: Option<f32>,
-    zo: Option<f32>,
-    bb: Option<AABB>
+    pub bbHeight: Option<f32>,
+    pub bbWidth: Option<f32>,
+    pub collision: Option<bool>,
+    pub fallDistance: Option<f32>,
+    pub footSize: Option<f32>,
+    pub heightOffset: Option<f32>,
+    pub horizontalCollision: Option<bool>,
+    pub hovered: Option<bool>,
+    pub makeStepSound: Option<bool>,
+    pub nextStep: Option<i32>,
+    pub noPhysics: Option<bool>,
+    pub onGround: Option<bool>,
+    pub pushthrough: Option<f32>,
+    pub removed: Option<bool>,
+    pub slide: Option<bool>,
+    pub textureId: Option<i32>,
+    pub walkDist: Option<f32>,
+    pub walkDistO: Option<f32>,
+    pub x: Option<f32>,
+    pub xOld: Option<f32>,
+    pub xRot: Option<f32>,
+    pub xRotO: Option<f32>,
+    pub xd: Option<f32>,
+    pub xo: Option<f32>,
+    pub y: Option<f32>,
+    pub yOld: Option<f32>,
+    pub yRot: Option<f32>,
+    pub yRotO: Option<f32>,
+    pub ySlideOffset: Option<f32>,
+    pub yd: Option<f32>,
+    pub yo: Option<f32>,
+    pub z: Option<f32>,
+    pub zOld: Option<f32>,
+    pub zd: Option<f32>,
+    pub zo: Option<f32>,
+    pub bb: Option<AABB>
 }
 
 impl EntityFields {
@@ -263,40 +263,40 @@ impl EntityFields {
 
 #[derive(Clone)]
 pub struct Mob {
-    airSupply: Option<i32>,
-    allowAlpha: Option<bool>,
-    animStep: Option<f32>,
-    animStepO: Option<f32>,
-    attackTime: Option<i32>,
-    bobStrength: Option<f32>,
-    dead: Option<bool>,
-    deathScore: Option<i32>,
-    deathTime: Option<i32>,
-    hasHair: Option<bool>,
-    health: Option<i32>,
-    hurtDir: Option<f32>,
-    hurtDuration: Option<i32>,
-    hurtTime: Option<i32>,
-    invulnerableDuration: Option<i32>,
-    invulnerableTime: Option<i32>,
-    lastHealth: Option<i32>,
-    oRun: Option<f32>,
-    oTilt: Option<f32>,
-    renderOffset: Option<f32>,
-    rot: Option<f32>,
-    rotA: Option<f32>,
-    rotOffs: Option<f32>,
-    run: Option<f32>,
-    speed: Option<f32>,
-    tickCount: Option<i32>,
-    tilt: Option<f32>,
-    timeOffs: Option<f32>,
-    yBodyRot: Option<f32>,
-    yBodyRotO: Option<f32>,
-    ai: Option<AI>,
-    modelName: Option<String>,
-    textureName: Option<String>,
-    entity: Option<EntityFields>
+    pub airSupply: Option<i32>,
+    pub allowAlpha: Option<bool>,
+    pub animStep: Option<f32>,
+    pub animStepO: Option<f32>,
+    pub attackTime: Option<i32>,
+    pub bobStrength: Option<f32>,
+    pub dead: Option<bool>,
+    pub deathScore: Option<i32>,
+    pub deathTime: Option<i32>,
+    pub hasHair: Option<bool>,
+    pub health: Option<i32>,
+    pub hurtDir: Option<f32>,
+    pub hurtDuration: Option<i32>,
+    pub hurtTime: Option<i32>,
+    pub invulnerableDuration: Option<i32>,
+    pub invulnerableTime: Option<i32>,
+    pub lastHealth: Option<i32>,
+    pub oRun: Option<f32>,
+    pub oTilt: Option<f32>,
+    pub renderOffset: Option<f32>,
+    pub rot: Option<f32>,
+    pub rotA: Option<f32>,
+    pub rotOffs: Option<f32>,
+    pub run: Option<f32>,
+    pub speed: Option<f32>,
+    pub tickCount: Option<i32>,
+    pub tilt: Option<f32>,
+    pub timeOffs: Option<f32>,
+    pub yBodyRot: Option<f32>,
+    pub yBodyRotO: Option<f32>,
+    pub ai: Option<AI>,
+    pub modelName: Option<String>,
+    pub textureName: Option<String>,
+    pub entity: Option<EntityFields>
 }
 
 impl Mob {
@@ -342,158 +342,158 @@ impl Mob {
 
 #[derive(Clone)]
 pub struct QuadrapedMob {
-    mob: Mob
+    pub mob: Mob
 }
 
 #[derive(Clone)]
 pub struct HumanoidMob {
-    armor: bool,
-    helmet: bool,
-    mob: Mob
+    pub armor: bool,
+    pub helmet: bool,
+    pub mob: Mob
 }
 
 #[derive(Clone)]
 pub struct Sheep {
-    graze: f32,
-    grazeO: f32,
-    grazing: bool,
-    grazingTime: i32,
-    hasFur: bool,
-    quadrapedMob: QuadrapedMob
+    pub graze: f32,
+    pub grazeO: f32,
+    pub grazing: bool,
+    pub grazingTime: i32,
+    pub hasFur: bool,
+    pub quadrapedMob: QuadrapedMob
 }
 
 #[derive(Clone)]
 pub struct Pig {
-    quadrapedMob: QuadrapedMob
+    pub quadrapedMob: QuadrapedMob
 }
 
 #[derive(Clone)]
 pub struct Creeper {
-    mob: Mob
+    pub mob: Mob
 }
 
 #[derive(Clone)]
 pub struct Zombie {
-    humanoidMob: HumanoidMob
+    pub humanoidMob: HumanoidMob
 }
 
 #[derive(Clone)]
 pub struct Skeleton {
-    zombie: Zombie
+    pub zombie: Zombie
 }
 
 #[derive(Clone)]
 pub struct Spider {
-    quadrapedMob: QuadrapedMob
+    pub quadrapedMob: QuadrapedMob
 }
 
 #[derive(Clone)]
 pub struct Player {
-    arrows: i32,
-    bob: f32,
-    oBob: f32,
-    score: i32,
-    userType: u8,
-    inventory: Inventory,
-    mob: Mob
+    pub arrows: i32,
+    pub bob: f32,
+    pub oBob: f32,
+    pub score: i32,
+    pub userType: u8,
+    pub inventory: Inventory,
+    pub mob: Mob
 }
 
 #[derive(Clone)]
 pub struct Item {
-    age: i32,
-    resource: i32,
-    rot: f32,
-    tickCount: i32,
-    xd: f32,
-    yd: f32,
-    zd: f32,
-    entity: EntityFields
+    pub age: i32,
+    pub resource: i32,
+    pub rot: f32,
+    pub tickCount: i32,
+    pub xd: f32,
+    pub yd: f32,
+    pub zd: f32,
+    pub entity: EntityFields
 }
 
 #[derive(Clone)]
 pub struct Arrow {
-    damage: i32,
-    gravity: f32,
-    hasHilt: bool,
-    stickTime: i32,
-    time: i32,
-    atype: i32,
-    xRot: f32,
-    xRotO: f32,
-    xd: f32,
-    yRot: f32,
-    yRotO: f32,
-    yd: f32,
-    zd: f32,
-    owner: Box<Option<Entity>>,
-    entity: EntityFields
+    pub damage: i32,
+    pub gravity: f32,
+    pub hasHilt: bool,
+    pub stickTime: i32,
+    pub time: i32,
+    pub atype: i32,
+    pub xRot: f32,
+    pub xRotO: f32,
+    pub xd: f32,
+    pub yRot: f32,
+    pub yRotO: f32,
+    pub yd: f32,
+    pub zd: f32,
+    pub owner: Box<Option<Entity>>,
+    pub entity: EntityFields
 }
 
 #[derive(Clone)]
 pub struct PrimedTnt {
-    life: i32,
-    xd: f32,
-    yd: f32,
-    zd: f32,
-    entity: EntityFields
+    pub life: i32,
+    pub xd: f32,
+    pub yd: f32,
+    pub zd: f32,
+    pub entity: EntityFields
 }
 
 #[derive(Clone)]
 pub struct Sign {
-    rot: f32,
-    xd: f32,
-    yd: f32,
-    zd: f32,
-    messages: Vec<String>,
-    entity: EntityFields
+    pub rot: f32,
+    pub xd: f32,
+    pub yd: f32,
+    pub zd: f32,
+    pub messages: Vec<String>,
+    pub entity: EntityFields
 }
 
 #[derive(Clone)]
 pub struct Smolder {
-    life: i32,
-    lifeTime: i32,
-    entity: EntityFields
+    pub life: i32,
+    pub lifeTime: i32,
+    pub entity: EntityFields
 }
 
 #[derive(Clone)]
 pub struct AABB {
-    epsilon: f32,
-    x0: f32,
-    x1: f32,
-    y0: f32,
-    y1: f32,
-    z0: f32,
-    z1: f32
+    pub epsilon: f32,
+    pub x0: f32,
+    pub x1: f32,
+    pub y0: f32,
+    pub y1: f32,
+    pub z0: f32,
+    pub z1: f32
 }
 
 #[derive(Clone)]
 pub struct AI {
-    damage: i32,
-    attackDelay: i32,
-    jumping: bool,
-    noActionTime: i32,
-    runSpeed: f32,
-    xxa: f32,
-    yRotA: f32,
-    yya: f32,
-    attackTarget: Box<Option<Entity>>,
-    mob: String,
-    random: Random1
+    pub damage: i32,
+    pub attackDelay: i32,
+    pub jumping: bool,
+    pub noActionTime: i32,
+    pub runSpeed: f32,
+    pub xxa: f32,
+    pub yRotA: f32,
+    pub yya: f32,
+    pub attackTarget: Box<Option<Entity>>,
+    pub mob: String,
+    pub random: Random1
 }
 
 #[derive(Clone)]
 pub struct Random1 {
-    haveNextNextGaussian: bool,
-    nextNextGaussian: f64,
-    seed: i64
+    pub haveNextNextGaussian: bool,
+    pub nextNextGaussian: f64,
+    pub seed: i64
 }
 
 #[derive(Clone)]
 pub struct Inventory {
-    selected: i32,
-    count: Vec<i32>,
-    popTime: Vec<i32>,
-    slots: Vec<i32>
+    pub selected: i32,
+    pub count: Vec<i32>,
+    pub popTime: Vec<i32>,
+    pub slots: Vec<i32>
 }
 
 #[derive(Error, Debug)]
@@ -519,7 +519,7 @@ pub enum ClassicError {
 * The following function accepts a file path, then reads in the file
 * and determines which version the classic file is from
 */
-fn read_level (file: String) -> Result <Level, ClassicError> {
+pub fn read_level (file: String) -> Result <Level, ClassicError> {
     //Reading in a classic level and converting it to a decompressed stream of bytes
     let stream: Vec<u8> = read(file).unwrap();
     let mut d_stream = GzDecoder::new(&stream[..]);
