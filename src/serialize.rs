@@ -322,9 +322,6 @@ pub enum DeserializeError {
     #[error("Index Out of Bounds: Index: {0}; Array Length: {1}")]
     IndexOutOfBounds(usize, usize),
 
-    #[error("Um, buddy this is not minecraft, this is: {0}")]
-    InvalidClass(String),
-
     #[error("Genuine Apologies, but {0} has not be implemented yet because I am confused...")]
     Unimplemented(String)
 }
@@ -362,8 +359,6 @@ impl Deserializer {
         if version != STREAM_VERSION {return Err(DeserializeError::InvalidVersion(version))}
 
         self.read_contents(bytes)?;
-
-        println!("{:?}", self.handles[6]);
 
         Ok(self.contents.clone())
     }
@@ -579,8 +574,6 @@ impl Deserializer {
                     let mut tmp_field: FieldDesc = FieldDesc::PrimitiveDesc('a', "b".to_string());
                     for field in list {
                         if bytes[self.buf] == TC_ENDBLOCKDATA { 
-                            println!("Previous field was: {:?}", tmp_field.clone());
-                            println!("Current field is: {:?}", field);
                             self.buf += 1; 
                         }
                         let code: char = field.get_typecode()?;
@@ -720,8 +713,6 @@ impl Serializer {
         for object in contents {
             self.write_object(object)?;
         }
-
-        println!("{:?}", self.handles[6]);
 
         Ok(&self.bytes)
     }
