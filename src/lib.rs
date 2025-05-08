@@ -6,11 +6,13 @@ mod serialize;
 mod from_stream;
 
 use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use from_stream::{i16_fs, i64_fs, str_fs, u16_fs, u32_fs};
 use serialize::{Deserializer,DeserializeError};
 
-use std::fs::read;
-use std::io::Read;
+use std::fs::{read, File, OpenOptions};
+use std::io::{Read, Write};
 
 use thiserror::Error;
 
@@ -508,11 +510,17 @@ pub enum ClassicError {
     #[error("Unrecognized main class, expected `com.mojang.minecraft.level.Level`, but found {0}")]
     InvalidClass(String),
 
+    #[error("File format not supported, expected 0-2 but found {0}")]
+    InvalidFileFormat(u8),
+
     #[error("Unexpected Entity: {0}")]
     UnexpectedEntity(String),
 
     #[error("Invalid Entity Request")]
-    InvalidEntity()
+    InvalidEntity(),
+
+    #[error("Unsupported Feature (Coming soon!)")]
+    UnsupportedFeature(),
 }
 
 /*
@@ -543,6 +551,24 @@ pub fn read_level (file: String) -> Result <Level, ClassicError> {
 }
 
 /*
+* This function accepts a level object and a path and writes it to a level.dat
+* in a classic format
+*/
+pub fn write_level (level: Level, path: String, format: u8) -> Result <(), ClassicError> {
+    match format {
+        0 => level_to_pre_classic(level, path)?,
+        1 => level_to_classic_13(level, path)?,
+        2 => {
+            //Serialization is not yet supported
+            return Err(ClassicError::UnsupportedFeature())
+        },
+        _ => return Err(ClassicError::InvalidFileFormat(format))
+    }
+
+    return Ok(())
+}
+
+/*
 * This function will be called to parse all Minecraft Levels from
 * rd-132211 to Classic 12a_03 
 * Pre-classic saves only store an array of blocks in the shape of 256 x 64 x 256
@@ -551,6 +577,29 @@ pub fn pre_classic_to_level (bytes: Vec<u8>) -> Level {
     let mut level: Level = Level::new();
     level.blocks = Some(bytes);
     return level;
+}
+
+/*
+* This function will write a minecraft level in pre-classic format
+* Pre-classic saves only store an array of blocks in the shape of 256 x 64 x 256
+*/
+pub fn level_to_pre_classic (level: Level, path: String) -> Result<(), ClassicError> {
+    let name: &str = if path == "" {"level.dat"} else {"/level.dat"};
+
+    let mut tiles: Vec<u8> = level.blocks.unwrap();
+    //Removing blocks if the array is greater than the size pre-classic can support
+    while tiles.len() > 256 * 64 * 256 {tiles.pop();}
+
+    let output= OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(path + name)
+        .unwrap();
+
+    let mut encoder = GzEncoder::new(output, Compression::default());
+    encoder.write_all(&tiles).unwrap();
+
+    Ok(())
 }
 
 /*
@@ -568,17 +617,19 @@ pub fn classic_13_to_level (bytes: Vec<u8>) -> Level {
 
     //Parsing and setting level name - String format
     let mut sh: u16 = u16_fs(buf, &bytes[..]);
+    buf += 2;
     level.name = Some(str_fs(buf, &bytes[..], sh as i32));
-    buf += 2 + sh as usize;
+    buf += sh as usize;
 
     //Parsing and setting author name - String format
     sh = u16_fs(buf, &bytes[..]);
+    buf += 2;
     level.creator = Some(str_fs(buf, &bytes[..], sh as i32));
-    buf += 2 + sh as usize;
+    buf += sh as usize;
 
     //Setting timestamp - Long format
     level.createTime = Some(i64_fs(buf, &bytes[..]));
-    buf += 2;
+    buf += 8;
 
     //Setting width, depth, and height - Short Format
     level.width = Some(i16_fs(buf, &bytes[..]) as i32);
@@ -598,6 +649,77 @@ pub fn classic_13_to_level (bytes: Vec<u8>) -> Level {
 
     return level;
 
+}
+
+/**
+ * Following function writes a level object to a classic file in the 13a file format
+ */
+pub fn level_to_classic_13(level: Level, path: String) -> Result<(),ClassicError> {
+    let mut bytes: Vec<u8> = Vec::new();
+
+    //Writing magic header and version number
+    let magic_number: u32 = 0x271BB788;
+    bytes.extend_from_slice(&magic_number.to_be_bytes());
+    if level.version.is_some() {bytes.push(level.version.unwrap())} else {bytes.push(1)}
+
+    //Setting Author
+    let name = if level.name.is_some() {level.name.unwrap()} else {String::from("A Nice World")};
+    let len = name.len() as u16;
+    bytes.extend_from_slice(&len.to_be_bytes());
+    let chars: Vec<char> = name.chars().collect();
+    for ch in chars {bytes.push(ch as u8)};
+
+    //Setting World Name
+    let creator = if level.creator.is_some() {level.creator.unwrap()} else {String::from("noname")};
+    let len = creator.len() as u16;
+    bytes.extend_from_slice(&len.to_be_bytes());
+    let chars: Vec<char> = creator.chars().collect();
+    for ch in chars {bytes.push(ch as u8)};
+
+    //Setting create time
+    if level.createTime.is_some() {
+        bytes.extend_from_slice(&level.createTime.unwrap().to_be_bytes())
+    } else {
+        bytes.extend_from_slice(&(0 as i64).to_be_bytes())
+    }
+
+    //Setting width, height, and depth
+    if level.width.is_some() {
+        bytes.extend_from_slice(&(level.width.unwrap() as i16).to_be_bytes())
+    } else {
+        bytes.extend_from_slice(&(256 as i16).to_be_bytes())
+    }
+    if level.height.is_some() {
+        bytes.extend_from_slice(&(level.height.unwrap() as i16).to_be_bytes())
+    } else {
+        bytes.extend_from_slice(&(256 as i16).to_be_bytes())
+    }
+    if level.depth.is_some() {
+        bytes.extend_from_slice(&(level.depth.unwrap() as i16).to_be_bytes())
+    } else {
+        bytes.extend_from_slice(&(64 as i16).to_be_bytes())
+    }
+
+    //Adding all blocks
+    if level.blocks.is_some() {
+        for tile in level.blocks.unwrap() {bytes.push(tile)}
+    }
+
+    //Setting file path
+    let name: &str = if path == "" {"level.dat"} else {"/level.dat"};
+
+    //Opening file
+    let output= OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(path + name)
+        .unwrap();
+
+    //Writing to file
+    let mut encoder = GzEncoder::new(output, Compression::default());
+    encoder.write_all(&bytes).unwrap();
+
+    Ok(())
 }
 
 /*
