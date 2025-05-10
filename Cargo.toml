@@ -1,7 +1,13 @@
 [package]
 name = "mc-classic"
+description = "Library to read and write classic minecraft files. Still in development, and unstable."
 version = "0.1.0"
 edition = "2021"
+authors = ["Sl1mj1m"]
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/Sl1mj1m14/rust-mc-classic"
+repository = "https://github.com/Sl1mj1m14/rust-mc-classic"
+readme = "README.md"
 
 [dependencies]
 flate2 = "1.1.1"
