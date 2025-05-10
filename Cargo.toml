@@ -1,7 +1,7 @@
 [package]
 name = "mc-classic"
 description = "Library to read and write classic minecraft files. Still in development, and unstable."
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Sl1mj1m"]
 license = "MIT OR Apache-2.0"

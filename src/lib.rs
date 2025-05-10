@@ -705,14 +705,11 @@ pub fn level_to_classic_13(level: Level, path: String) -> Result<(),ClassicError
         for tile in level.blocks.unwrap() {bytes.push(tile)}
     }
 
-    //Setting file path
-    let name: &str = if path == "" {"level.dat"} else {"/level.dat"};
-
     //Opening file
     let output= OpenOptions::new()
         .write(true)
         .create(true)
-        .open(path + name)
+        .open(path)
         .unwrap();
 
     //Writing to file
