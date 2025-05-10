@@ -788,7 +788,7 @@ pub fn classic_to_level (bytes: Vec<u8>) -> Result<Level, ClassicError> {
                 level.creator = values[i].get_object()?.get_new_string()?.string; 
             },
             "name" => { 
-                level.creator = values[i].get_object()?.get_new_string()?.string; 
+                level.name = values[i].get_object()?.get_new_string()?.string; 
             },
             "entities" => (), //All instances of the entities list are empty in the classic file, and as such this does not need to be parsed 
             "blockMap" => {
