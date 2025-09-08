@@ -809,17 +809,20 @@ impl Serializer {
         if new_string.string.is_none() { return Ok(()) }
         self.handles.push(Object::NewString(new_string.clone()));
 
-        let chars: Vec<char> = new_string.string.unwrap().chars().collect();
+        //let chars: Vec<char> = new_string.string.unwrap().chars().collect();
 
-        if chars.len() as i32 >= STR_LEN {
+        let str1 = new_string.string.unwrap();
+
+        if str1.len() as i32 >= STR_LEN {
             self.bytes.push(TC_LONGSTRING);
-            self.bytes.extend_from_slice(&(chars.len() as i32).to_be_bytes());
+            self.bytes.extend_from_slice(&(str1.len() as i32).to_be_bytes());
         } else {
             self.bytes.push(TC_STRING);
-            self.bytes.extend_from_slice(&(chars.len() as i16).to_be_bytes());
+            self.bytes.extend_from_slice(&(str1.len() as i16).to_be_bytes());
         }
 
-        for ch in chars { self.bytes.push(ch as u8); }
+        self.bytes.extend_from_slice(str1.as_bytes());
+        //for ch in chars { self.bytes.push(ch as u8); }
 
         Ok(())
     }
@@ -834,9 +837,10 @@ impl Serializer {
 
         self.bytes.push(TC_CLASSDESC);
 
-        let chars: Vec<char> = new_class_desc.class_name.chars().collect();
-        self.bytes.extend_from_slice(&(chars.len() as i16).to_be_bytes());
-        for ch in chars { self.bytes.push(ch as u8); }
+        //let chars: Vec<char> = new_class_desc.class_name.chars().collect();
+        self.bytes.extend_from_slice(&(new_class_desc.class_name.len() as i16).to_be_bytes());
+        self.bytes.extend_from_slice(new_class_desc.class_name.as_bytes());
+        //for ch in chars { self.bytes.push(ch as u8); }
 
         self.bytes.extend_from_slice(&new_class_desc.uuid.to_be_bytes());
 
@@ -918,9 +922,10 @@ impl Serializer {
 
         self.bytes.push(field_desc.get_typecode()?.clone() as u8);
 
-        let chars: Vec<char> = field_desc.clone().get_field_name()?.chars().collect();
-        self.bytes.extend_from_slice(&(chars.len() as i16).to_be_bytes());
-        for ch in chars { self.bytes.push(ch as u8) }
+        //let chars: Vec<char> = field_desc.clone().get_field_name()?.chars().collect();
+        self.bytes.extend_from_slice(&(field_desc.clone().get_field_name()?.len() as i16).to_be_bytes());
+        self.bytes.extend_from_slice(field_desc.clone().get_field_name()?.as_bytes());
+        //for ch in chars { self.bytes.push(ch as u8) }
 
         if matches!(field_desc.clone(), FieldDesc::ObjectDesc(_,_,_)) {
             let ftype = field_desc.get_field_type()?;

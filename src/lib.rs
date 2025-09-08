@@ -666,15 +666,17 @@ pub fn level_to_classic_13(level: Level, path: String) -> Result<(),ClassicError
     let name = if level.name.is_some() {level.name.unwrap()} else {String::from("A Nice World")};
     let len = name.len() as u16;
     bytes.extend_from_slice(&len.to_be_bytes());
-    let chars: Vec<char> = name.chars().collect();
-    for ch in chars {bytes.push(ch as u8)};
+    bytes.extend_from_slice(name.as_bytes());
+    //let chars: Vec<char> = name.chars().collect();
+    //for ch in chars {bytes.push(ch as u8)};
 
     //Setting World Name
     let creator = if level.creator.is_some() {level.creator.unwrap()} else {String::from("noname")};
     let len = creator.len() as u16;
     bytes.extend_from_slice(&len.to_be_bytes());
-    let chars: Vec<char> = creator.chars().collect();
-    for ch in chars {bytes.push(ch as u8)};
+    bytes.extend_from_slice(creator.as_bytes());
+    //let chars: Vec<char> = creator.chars().collect();
+    //for ch in chars {bytes.push(ch as u8)};
 
     //Setting create time
     if level.createTime.is_some() {
