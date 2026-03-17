@@ -13,6 +13,7 @@ use serialize::{Deserializer,DeserializeError};
 
 use std::fs::{read, File, OpenOptions};
 use std::io::{Read, Write};
+use std::path::PathBuf;
 
 use thiserror::Error;
 
@@ -527,7 +528,7 @@ pub enum ClassicError {
 * The following function accepts a file path, then reads in the file
 * and determines which version the classic file is from
 */
-pub fn read_level (file: String) -> Result <Level, ClassicError> {
+pub fn read_level (file: PathBuf) -> Result <Level, ClassicError> {
     //Reading in a classic level and converting it to a decompressed stream of bytes
     let stream: Vec<u8> = read(file).unwrap();
     let mut d_stream = GzDecoder::new(&stream[..]);
