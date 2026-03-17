@@ -502,6 +502,9 @@ pub struct Inventory {
 #[derive(Error, Debug)]
 
 pub enum ClassicError {
+    #[error(transparent)]
+    FileNotFound(#[from] std::io::Error),
+    
     #[error("Error Deserializing")]
     DeserializeError(#[from] DeserializeError),
 
@@ -530,7 +533,7 @@ pub enum ClassicError {
 */
 pub fn read_level (file: PathBuf) -> Result <Level, ClassicError> {
     //Reading in a classic level and converting it to a decompressed stream of bytes
-    let stream: Vec<u8> = read(file).unwrap();
+    let stream: Vec<u8> = read(file)?;
     let mut d_stream = GzDecoder::new(&stream[..]);
     let mut bytes: Vec<u8> = Vec::new();
     d_stream.read_to_end(&mut bytes).unwrap();
